@@ -1,0 +1,103 @@
+%%{init: {'theme': 'default'}}%%
+flowchart LR
+    subgraph Actors
+        A[👤 Admin\nQuản trị viên]
+        T[👨‍🏫 Teacher\nGiáo viên]
+        S[👨‍🎓 Student\nHọc sinh]
+    end
+
+    subgraph UC_Auth["🔐 Authentication"]
+        UC1[Đăng nhập]
+        UC2[Đăng xuất]
+        UC3[Đổi mật khẩu]
+        UC4[Cập nhật hồ sơ]
+    end
+
+    subgraph UC_Admin["⚙️ Admin Functions"]
+        UC5[Quản lý người dùng]
+        UC6[Tạo/Sửa tài khoản]
+        UC7[Khóa tài khoản]
+        UC8[Quản lý lớp học]
+        UC9[Tạo lớp học]
+        UC10[Thêm/Xóa HS khỏi lớp]
+        UC11[Quản lý môn học]
+        UC12[Tạo khóa học\n phân công GV]
+        UC13[Xem thống kê\ntổng quan]
+    end
+
+    subgraph UC_Teacher["📚 Teacher Functions"]
+        UC14[Xem lớp học\nphụ trách]
+        UC15[Tạo bài giảng]
+        UC16[Đăng/Ẩn bài giảng]
+        UC17[Đính kèm file/video]
+        UC18[Tạo bài tập trắc nghiệm]
+        UC19[Cài đặt bài tập\nthời gian, điểm số]
+        UC20[Tạo bài tập tự luận]
+        UC21[Đăng/Ẩn bài tập]
+        UC22[Xem bài nộp\nhọc sinh]
+        UC23[Chấm điểm\nvà phản hồi]
+        UC24[Đăng thông báo lớp]
+        UC25[Xem thống kê\nmôn học]
+    end
+
+    subgraph UC_Student["🎯 Student Functions"]
+        UC26[Xem danh sách\nmôn học]
+        UC27[Xem bài giảng]
+        UC28[Xem video/tải tài liệu]
+        UC29[Bình luận bài giảng]
+        UC30[Xem bài tập]
+        UC31[Làm bài trắc nghiệm\ncó đếm giờ]
+        UC32[Nộp bài tự luận]
+        UC33[Tải file bài tập]
+        UC34[Xem kết quả\nvà điểm số]
+        UC35[Xem thông báo]
+        UC36[Nhận thông báo\nhệ thống]
+    end
+
+    %% Connections
+    A --> UC1
+    A --> UC2
+    A --> UC3
+    A --> UC4
+    A --> UC5
+    A --> UC6
+    A --> UC7
+    A --> UC8
+    A --> UC9
+    A --> UC10
+    A --> UC11
+    A --> UC12
+    A --> UC13
+
+    T --> UC1
+    T --> UC2
+    T --> UC3
+    T --> UC4
+    T --> UC14
+    T --> UC15
+    T --> UC16
+    T --> UC17
+    T --> UC18
+    T --> UC19
+    T --> UC20
+    T --> UC21
+    T --> UC22
+    T --> UC23
+    T --> UC24
+    T --> UC25
+
+    S --> UC1
+    S --> UC2
+    S --> UC3
+    S --> UC4
+    S --> UC26
+    S --> UC27
+    S --> UC28
+    S --> UC29
+    S --> UC30
+    S --> UC31
+    S --> UC32
+    S --> UC33
+    S --> UC34
+    S --> UC35
+    S --> UC36
