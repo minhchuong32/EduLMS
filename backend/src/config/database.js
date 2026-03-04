@@ -46,3 +46,31 @@ const closePool = async () => {
 };
 
 module.exports = { sql, getPool, query, closePool, config };
+
+// const { Pool } = require("pg");
+// require("dotenv").config();
+
+// const pool = new Pool({
+//   connectionString: process.env.DATABASE_URL,
+//   ssl: { rejectUnauthorized: false },
+//   max: 10,
+//   idleTimeoutMillis: 30000,
+// });
+
+// // query() hỗ trợ cả @param (cũ) và $1 (mới)
+// const query = async (text, params = {}) => {
+//   if (!params || Array.isArray(params)) {
+//     return pool.query(text, params || []);
+//   }
+//   // Chuyển @key → $1, $2...
+//   const keys = Object.keys(params);
+//   let sql = text;
+//   const values = [];
+//   keys.forEach((key, i) => {
+//     sql = sql.replace(new RegExp(`@${key}\\b`, "g"), `$${i + 1}`);
+//     values.push(params[key]);
+//   });
+//   return pool.query(sql, values);
+// };
+
+// module.exports = { query, pool };
