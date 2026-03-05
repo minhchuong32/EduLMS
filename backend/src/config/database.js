@@ -24,7 +24,7 @@ let pool = null;
 const getPool = async () => {
   if (!pool) {
     pool = await sql.connect(config);
-    console.log('✅ Connected to SQL Server');
+    console.log('Connected to SQL Server');
   }
   return pool;
 };
