@@ -23,6 +23,23 @@ Hệ thống hỗ trợ đầy đủ các nghiệp vụ cốt lõi:
 
 ---
 
+## 📸 Demo UI
+
+### 🏠 Dashboard
+<p align="center">
+  <img src="docs/images/dashboard.png" width="800"/>
+</p>
+
+### 👨‍🏫 Teacher - Quản lý bài giảng
+<p align="center">
+  <img src="docs/images/teacher-page.png" width="800"/>
+</p>
+
+### 🧑‍🎓 Student - Làm bài trắc nghiệm
+<p align="center">
+  <img src="docs/images/student-quiz.png" width="800"/>
+</p>
+
 ## 🎯 Điểm nổi bật
 
 - 📌 **Phân quyền rõ ràng (RBAC)**
