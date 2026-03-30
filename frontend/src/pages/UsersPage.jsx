@@ -41,7 +41,7 @@ export default function UsersPage() {
       setForm({ fullName: '', email: '', role: 'student', password: 'School@123' });
       toast.success('Tạo tài khoản thành công!');
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Có lỗi xảy ra');
+      toast.error(err.response?.data?.error || 'Có lỗi xảy ra !!!');
     }
   };
 
