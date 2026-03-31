@@ -20,9 +20,9 @@ export default function AssignmentDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [starting, setStarting] = useState(false);
 
-  const [loaded, setLoaded] = useState(false); // ✅ chống gọi lại
+  const [loaded, setLoaded] = useState(false); //  chống gọi lại
 
-  // ✅ load data (tách riêng + memo)
+  //  load data (tách riêng + memo)
   const loadData = useCallback(async () => {
     if (!user || loaded) return;
 
@@ -37,7 +37,7 @@ export default function AssignmentDetailPage() {
         setMySubmissions(submissionRes.data);
       }
 
-      setLoaded(true); // ✅ chỉ load 1 lần
+      setLoaded(true); //  chỉ load 1 lần
     } catch (err) {
       console.error(err);
       toast.error('Không thể tải dữ liệu');
@@ -50,7 +50,7 @@ export default function AssignmentDetailPage() {
     loadData();
   }, [loadData]);
 
-  // ✅ start quiz (chống spam)
+  //  start quiz (chống spam)
   const handleStartQuiz = async () => {
     if (starting) return;
 
@@ -65,7 +65,7 @@ export default function AssignmentDetailPage() {
     }
   };
 
-  // ✅ submit essay
+  //  submit essay
   const handleSubmitEssay = async (e) => {
     e.preventDefault();
     if (submitting) return;
