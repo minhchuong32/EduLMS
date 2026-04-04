@@ -487,7 +487,7 @@ export default function CreateAssignmentModal({
                           onChange={(e) =>
                             updateQuestion(qi, "explanation", e.target.value)
                           }
-                          placeholder="Giải thích đáp án (tuỳ chọn)..."
+                          placeholder="Giải thích đáp án (tuỳ chọn)"
                           className="w-full border border-dashed border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-500 focus:outline-none bg-white"
                         />
                       </div>
