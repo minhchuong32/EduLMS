@@ -60,6 +60,7 @@ export default function Layout() {
   const navItems = NAV_ITEMS[user?.role] || [];
   // Bottom nav chỉ hiện 4 mục đầu trên mobile
   const bottomNavItems = navItems.slice(0, 4);
+  const isQuizRoute = /^\/assignments\/[^/]+\/quiz$/.test(location.pathname);
 
   const handleLogout = async () => {
     await logout();
@@ -174,29 +175,31 @@ export default function Layout() {
 
       {/* ── Mobile: Top bar ──────────────────────────────────────────────────── */}
       <div className="flex flex-col flex-1 min-w-0">
-        <header className="md:hidden flex items-center justify-between bg-white border-b border-gray-100 px-4 py-3 shadow-sm z-20">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
-              <AcademicCapIcon className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-bold text-gray-800">EduLMS</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link to="/profile">
-              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                <span className="text-white text-xs font-bold">
-                  {user?.fullName?.[0]}
-                </span>
+        {!isQuizRoute && (
+          <header className="md:hidden flex items-center justify-between bg-white border-b border-gray-100 px-4 py-3 shadow-sm z-20">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
+                <AcademicCapIcon className="w-4 h-4 text-white" />
               </div>
-            </Link>
-            <button
-              onClick={() => setMobileOpen(true)}
-              className="p-1.5 rounded-lg hover:bg-gray-100"
-            >
-              <Bars3Icon className="w-5 h-5 text-gray-600" />
-            </button>
-          </div>
-        </header>
+              <span className="font-bold text-gray-800">EduLMS</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link to="/profile">
+                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                  <span className="text-white text-xs font-bold">
+                    {user?.fullName?.[0]}
+                  </span>
+                </div>
+              </Link>
+              <button
+                onClick={() => setMobileOpen(true)}
+                className="p-1.5 rounded-lg hover:bg-gray-100"
+              >
+                <Bars3Icon className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+          </header>
+        )}
 
         {/* ── Mobile: Drawer menu ─────────────────────────────────────────── */}
         {mobileOpen && (
@@ -274,29 +277,33 @@ export default function Layout() {
         )}
 
         {/* ── Main content ────────────────────────────────────────────────── */}
-        <main className="flex-1 overflow-auto pb-16 md:pb-0">
+        <main
+          className={`flex-1 overflow-auto md:pb-0 ${isQuizRoute ? "pb-0" : "pb-[calc(4rem+env(safe-area-inset-bottom))]"}`}
+        >
           <Outlet />
         </main>
 
         {/* ── Mobile: Bottom nav ──────────────────────────────────────────── */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-20 flex">
-          {bottomNavItems.map(({ to, icon: Icon, label }) => {
-            const active = location.pathname.startsWith(to);
-            return (
-              <Link
-                key={to}
-                to={to}
-                className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs font-medium transition-colors
+        {!isQuizRoute && (
+          <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-20 flex pb-[env(safe-area-inset-bottom)]">
+            {bottomNavItems.map(({ to, icon: Icon, label }) => {
+              const active = location.pathname.startsWith(to);
+              return (
+                <Link
+                  key={to}
+                  to={to}
+                  className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs font-medium transition-colors
                   ${active ? "text-blue-600" : "text-gray-400 hover:text-gray-600"}`}
-              >
-                <Icon
-                  className={`w-5 h-5 ${active ? "text-blue-600" : "text-gray-400"}`}
-                />
-                <span className="leading-tight truncate">{label}</span>
-              </Link>
-            );
-          })}
-        </nav>
+                >
+                  <Icon
+                    className={`w-5 h-5 ${active ? "text-blue-600" : "text-gray-400"}`}
+                  />
+                  <span className="leading-tight truncate">{label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+        )}
       </div>
     </div>
   );
