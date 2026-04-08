@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   sqlserver:
@@ -6,14 +6,29 @@ services:
     container_name: lms-sqlserver
     environment:
       - ACCEPT_EULA=Y
-      - MSSQL_SA_PASSWORD=YourStrongPassword123!
+      - MSSQL_SA_PASSWORD=Edulmsdb2026!
       - MSSQL_PID=Express
     ports:
       - "1433:1433"
     volumes:
       - sqlserver_data:/var/opt/mssql
     healthcheck:
-      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P YourStrongPassword123! -Q "SELECT 1" -b -o /dev/null
+      test:
+        [
+          "CMD",
+          "/opt/mssql-tools/bin/sqlcmd",
+          "-S",
+          "localhost",
+          "-U",
+          "sa",
+          "-P",
+          "Edulmsdb2026!",
+          "-Q",
+          "SELECT 1",
+          "-b",
+          "-o",
+          "/dev/null",
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -23,35 +38,16 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: lms-backend
+    restart: always
     ports:
       - "5000:5000"
-    environment:
-      - NODE_ENV=production
-      - PORT=5000
-      - DB_SERVER=sqlserver
-      - DB_NAME=LMS_DB
-      - DB_USER=sa
-      - DB_PASSWORD=YourStrongPassword123!
-      - DB_TRUST_CERT=true
-      - JWT_SECRET=change_me_super_secret_key
-      - JWT_REFRESH_SECRET=change_me_refresh_secret
-      - FRONTEND_URL=http://localhost:3000
-    volumes:
-      - uploads_data:/app/uploads
+    env_file:
+      - ./backend/.env # Lệnh này giúp Docker nạp toàn bộ biến từ file .env vào
     depends_on:
       sqlserver:
-        condition: service_healthy
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: lms-frontend
-    ports:
-      - "3000:80"
-    depends_on:
-      - backend
+        condition: service_healthy # Chỉ chạy backend khi database đã sẵn sàng hoàn toàn
+    volumes:
+      - ./backend/uploads:/app/uploads # Để lưu file bài giảng không bị mất khi restart
 
 volumes:
   sqlserver_data:
-  uploads_data:
