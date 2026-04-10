@@ -1,0 +1,9 @@
+node_modules
+.env
+.git
+.gitignore
+uploads
+Dockerfile
+vercel.json
+README.md
+*.log

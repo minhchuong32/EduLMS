@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     container_name: lms-postgres
     environment:
-      - POSTGRES_DB=lms
+      - POSTGRES_DB=lms 
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
     ports:

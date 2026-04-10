@@ -21,21 +21,20 @@ const NAV_ITEMS = {
     { to: "/courses", icon: BookOpenIcon, label: "Khóa học" },
     { to: "/classes", icon: AcademicCapIcon, label: "Lớp học" },
     { to: "/users", icon: UsersIcon, label: "Người dùng" },
-    { to: "/announcements", icon: MegaphoneIcon, label: "Thông báo" },
-    { to: "/notifications", icon: BellIcon, label: "Thông báo HT" },
+    { to: "/announcements", icon: MegaphoneIcon, label: "Bảng tin" },
+    { to: "/notifications", icon: BellIcon, label: "Thông báo hệ thống demo" },
   ],
   teacher: [
     { to: "/dashboard", icon: HomeIcon, label: "Tổng quan" },
     { to: "/courses", icon: BookOpenIcon, label: "Môn học" },
     { to: "/classes", icon: AcademicCapIcon, label: "Lớp học" },
-    { to: "/announcements", icon: MegaphoneIcon, label: "Thông báo" },
-    { to: "/notifications", icon: BellIcon, label: "Thông báo" },
+    { to: "/announcements", icon: MegaphoneIcon, label: "Bảng tin" },
+    { to: "/notifications", icon: BellIcon, label: "Thông báo hệ thống" },
   ],
   student: [
     { to: "/dashboard", icon: HomeIcon, label: "Tổng quan" },
     { to: "/courses", icon: BookOpenIcon, label: "Môn học" },
-    { to: "/announcements", icon: MegaphoneIcon, label: "Thông báo" },
-    { to: "/notifications", icon: BellIcon, label: "Thông báo" },
+    { to: "/announcements", icon: MegaphoneIcon, label: "Bảng tin" },
   ],
 };
 
