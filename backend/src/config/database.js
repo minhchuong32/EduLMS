@@ -16,6 +16,75 @@ const pool = new Pool({
   idleTimeoutMillis: 30000,
 });
 
+const legacyKeyMap = {
+  fullname: "fullName",
+  passwordhash: "passwordHash",
+  dateofbirth: "dateOfBirth",
+  isactive: "isActive",
+  createdat: "createdAt",
+  updatedat: "updatedAt",
+  gradelevel: "gradeLevel",
+  academicyear: "academicYear",
+  studentid: "studentId",
+  teacherid: "teacherId",
+  subjectid: "subjectId",
+  classid: "classId",
+  joinedat: "joinedAt",
+  courseenrollmentid: "courseEnrollmentId",
+  fileurl: "fileUrl",
+  videourl: "videoUrl",
+  orderindex: "orderIndex",
+  ispublished: "isPublished",
+  publishedat: "publishedAt",
+  duedate: "dueDate",
+  startdate: "startDate",
+  timelimitminutes: "timeLimitMinutes",
+  totalpoints: "totalPoints",
+  maxattempts: "maxAttempts",
+  shufflequestions: "shuffleQuestions",
+  showresultimmediately: "showResultImmediately",
+  assignmentid: "assignmentId",
+  questiontext: "questionText",
+  questiontype: "questionType",
+  iscorrect: "isCorrect",
+  attemptnumber: "attemptNumber",
+  essaycontent: "essayContent",
+  submittedat: "submittedAt",
+  gradedby: "gradedBy",
+  gradedat: "gradedAt",
+  selectedoptionids: "selectedOptionIds",
+  pointsearned: "pointsEarned",
+  referenceid: "referenceId",
+  userid: "userId",
+  expiresat: "expiresAt",
+  parentid: "parentId",
+  authorid: "authorId",
+  lessonid: "lessonId",
+  subjectname: "subjectName",
+  teachername: "teacherName",
+  teacheravatar: "teacherAvatar",
+  classname: "className",
+  authorname: "authorName",
+  authoravatar: "authorAvatar",
+  authorrole: "authorRole",
+  studentname: "studentName",
+  studentavatar: "studentAvatar",
+  assignmenttitle: "assignmentTitle",
+  assignmenttype: "assignmentType",
+  questionpoints: "questionPoints",
+};
+
+const mapRowKeys = (row) => {
+  const mapped = { ...row };
+  Object.entries(row).forEach(([key, value]) => {
+    const legacyKey = legacyKeyMap[key];
+    if (legacyKey && mapped[legacyKey] === undefined) {
+      mapped[legacyKey] = value;
+    }
+  });
+  return mapped;
+};
+
 const replaceNamedParams = (text, params) => {
   if (!params || Array.isArray(params)) {
     return { text, values: params || [] };
@@ -38,7 +107,10 @@ const query = async (text, params = {}, client = null) => {
   const { text: q, values } = replaceNamedParams(text, params);
   const runner = client || pool;
   const result = await runner.query(q, values);
-  return { recordset: result.rows, rowsAffected: [result.rowCount] };
+  return {
+    recordset: result.rows.map(mapRowKeys),
+    rowsAffected: [result.rowCount],
+  };
 };
 
 const withTransaction = async (fn) => {
