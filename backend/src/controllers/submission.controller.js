@@ -1,4 +1,4 @@
-const { query, sql, getPool } = require('../config/database');
+const { query, withTransaction } = require("../config/database");
 
 // POST /api/submissions/start
 const startSubmission = async (req, res) => {
@@ -8,7 +8,7 @@ const startSubmission = async (req, res) => {
 
     // Check assignment
     const assignmentResult = await query(
-      'SELECT * FROM Assignments WHERE id = @id AND isPublished = 1',
+      "SELECT * FROM Assignments WHERE id = @id AND isPublished = true",
       { id: assignmentId }
     );
     if (!assignmentResult.recordset.length) {
@@ -37,11 +37,14 @@ const startSubmission = async (req, res) => {
       return res.json(existing.recordset[0]);
     }
 
-    const result = await query(`
+    const result = await query(
+      `
       INSERT INTO Submissions (assignmentId, studentId, attemptNumber, status, startedAt)
-      OUTPUT INSERTED.*
-      VALUES (@assignmentId, @studentId, @attempt, 'in_progress', GETDATE())
-    `, { assignmentId, studentId, attempt: attempts + 1 });
+      VALUES (@assignmentId, @studentId, @attempt, 'in_progress', NOW())
+      RETURNING *
+    `,
+      { assignmentId, studentId, attempt: attempts + 1 },
+    );
 
     res.status(201).json(result.recordset[0]);
   } catch (err) {
@@ -69,85 +72,105 @@ const submitQuiz = async (req, res) => {
     const submission = submissionResult.recordset[0];
 
     // Get all questions with correct answers
-    const questionsResult = await query(`
-      SELECT q.id, q.questionType, q.points,
-             (SELECT ao.id, ao.isCorrect FROM AnswerOptions ao WHERE ao.questionId = q.id FOR JSON PATH) AS options
-      FROM Questions q WHERE q.assignmentId = @aid
-    `, { aid: submission.assignmentId });
+    const questionsResult = await query(
+      `
+      SELECT
+        q.id, q.questionType, q.points,
+        COALESCE(
+          json_agg(
+            json_build_object('id', ao.id, 'isCorrect', ao."isCorrect")
+            ORDER BY ao."orderIndex"
+          ) FILTER (WHERE ao.id IS NOT NULL),
+          '[]'::json
+        ) AS options
+      FROM Questions q
+      LEFT JOIN AnswerOptions ao ON ao."questionId" = q.id
+      WHERE q."assignmentId" = @aid
+      GROUP BY q.id
+    `,
+      { aid: submission.assignmentId },
+    );
 
-    const questions = questionsResult.recordset.map(q => ({
+    const questions = questionsResult.recordset.map((q) => ({
       ...q,
-      options: q.options ? JSON.parse(q.options) : [],
+      options: q.options || [],
     }));
 
-    const pool = await getPool();
-    const transaction = new sql.Transaction(pool);
-    await transaction.begin();
-
-    try {
+    const out = await withTransaction(async (client) => {
       let totalScore = 0;
       let maxScore = 0;
 
       for (const question of questions) {
         maxScore += question.points;
-        const answer = answers.find(a => a.questionId === question.id);
+        const answer = answers.find((a) => a.questionId === question.id);
         const selectedIds = answer ? answer.selectedOptionIds : [];
-        const correctOptionIds = question.options.filter(o => o.isCorrect).map(o => o.id);
+        const correctOptionIds = question.options
+          .filter((o) => o.isCorrect)
+          .map((o) => o.id);
 
         let isCorrect = false;
         let pointsEarned = 0;
 
-        if (question.questionType === 'single_choice' || question.questionType === 'true_false') {
+        if (
+          question.questionType === "single_choice" ||
+          question.questionType === "true_false"
+        ) {
           isCorrect = selectedIds.length === 1 && correctOptionIds.includes(selectedIds[0]);
           pointsEarned = isCorrect ? question.points : 0;
-        } else if (question.questionType === 'multiple_choice') {
+        } else if (question.questionType === "multiple_choice") {
           const correctSet = new Set(correctOptionIds);
           const selectedSet = new Set(selectedIds);
-          const allCorrect = [...correctSet].every(id => selectedSet.has(id));
-          const noWrong = [...selectedSet].every(id => correctSet.has(id));
+          const allCorrect = [...correctSet].every((id) => selectedSet.has(id));
+          const noWrong = [...selectedSet].every((id) => correctSet.has(id));
           isCorrect = allCorrect && noWrong && selectedIds.length > 0;
           pointsEarned = isCorrect ? question.points : 0;
         }
 
         totalScore += pointsEarned;
 
-        await new sql.Request(transaction)
-          .input('submissionId', id)
-          .input('questionId', question.id)
-          .input('selectedOptionIds', JSON.stringify(selectedIds))
-          .input('isCorrect', isCorrect ? 1 : 0)
-          .input('pointsEarned', pointsEarned)
-          .query(`
+        await query(
+          `
             INSERT INTO StudentAnswers (submissionId, questionId, selectedOptionIds, isCorrect, pointsEarned)
             VALUES (@submissionId, @questionId, @selectedOptionIds, @isCorrect, @pointsEarned)
-          `);
+          `,
+          {
+            submissionId: id,
+            questionId: question.id,
+            selectedOptionIds: JSON.stringify(selectedIds),
+            isCorrect,
+            pointsEarned,
+          },
+          client,
+        );
       }
 
       const finalScore = maxScore > 0 ? (totalScore / maxScore) * submission.totalPoints : 0;
       const roundedScore = Math.round(finalScore * 100) / 100;
 
-      await new sql.Request(transaction)
-        .input('id', id)
-        .input('score', roundedScore)
-        .query(`
+      await query(
+        `
           UPDATE Submissions SET
-            submittedAt = GETDATE(),
+            submittedAt = NOW(),
             score = @score,
             status = 'graded',
-            gradedAt = GETDATE()
+            gradedAt = NOW()
           WHERE id = @id
-        `);
+        `,
+        { id, score: roundedScore },
+        client,
+      );
 
-      await transaction.commit();
+      return { roundedScore };
+    });
 
-      if (submission.showResultImmediately) {
-        res.json({ message: 'Quiz submitted', score: roundedScore, totalPoints: submission.totalPoints });
-      } else {
-        res.json({ message: 'Quiz submitted successfully' });
-      }
-    } catch (err) {
-      await transaction.rollback();
-      throw err;
+    if (submission.showResultImmediately) {
+      res.json({
+        message: "Quiz submitted",
+        score: out.roundedScore,
+        totalPoints: submission.totalPoints,
+      });
+    } else {
+      res.json({ message: "Quiz submitted successfully" });
     }
   } catch (err) {
     console.error(err);
@@ -176,14 +199,17 @@ const submitEssay = async (req, res) => {
     const dueDate = assignmentResult.recordset[0].dueDate;
     const isLate = dueDate && new Date() > new Date(dueDate);
 
-    await query(`
+    await query(
+      `
       UPDATE Submissions SET
         essayContent = @content,
         fileUrl = COALESCE(@fileUrl, fileUrl),
-        submittedAt = GETDATE(),
+        submittedAt = NOW(),
         status = @status
       WHERE id = @id
-    `, { id, content: essayContent || null, fileUrl, status: isLate ? 'late' : 'submitted' });
+    `,
+      { id, content: essayContent || null, fileUrl, status: isLate ? "late" : "submitted" },
+    );
 
     res.json({ message: 'Essay submitted successfully', isLate });
   } catch (err) {
@@ -198,24 +224,30 @@ const gradeSubmission = async (req, res) => {
     const { score, feedback } = req.body;
     const teacherId = req.user.id;
 
-    await query(`
+    await query(
+      `
       UPDATE Submissions SET
         score = @score,
         feedback = @feedback,
         gradedBy = @gradedBy,
-        gradedAt = GETDATE(),
+        gradedAt = NOW(),
         status = 'graded'
       WHERE id = @id
-    `, { id, score, feedback, gradedBy: teacherId });
+    `,
+      { id, score, feedback, gradedBy: teacherId },
+    );
 
     // Send notification to student
     const subResult = await query('SELECT studentId, assignmentId FROM Submissions WHERE id = @id', { id });
     if (subResult.recordset.length) {
       const { studentId, assignmentId } = subResult.recordset[0];
-      await query(`
+      await query(
+        `
         INSERT INTO Notifications (userId, title, message, type, referenceId)
-        VALUES (@userId, N'Bài tập đã được chấm', N'Giáo viên đã chấm bài tập của bạn', 'grade', @refId)
-      `, { userId: studentId, refId: assignmentId });
+        VALUES (@userId, 'Bài tập đã được chấm', 'Giáo viên đã chấm bài tập của bạn', 'grade', @refId)
+      `,
+        { userId: studentId, refId: assignmentId },
+      );
     }
 
     res.json({ message: 'Graded successfully' });
@@ -265,18 +297,33 @@ const getSubmissionDetail = async (req, res) => {
     const submission = result.recordset[0];
 
     if (submission.assignmentType === 'quiz') {
-      const answers = await query(`
+      const answers = await query(
+        `
         SELECT sa.*, q.questionText, q.questionType, q.points AS questionPoints, q.explanation,
-               (SELECT ao.id, ao.optionText, ao.isCorrect, ao.orderIndex 
-                FROM AnswerOptions ao WHERE ao.questionId = q.id ORDER BY ao.orderIndex FOR JSON PATH) AS options
+               COALESCE(
+                 json_agg(
+                   json_build_object(
+                     'id', ao.id,
+                     'optionText', ao."optionText",
+                     'isCorrect', ao."isCorrect",
+                     'orderIndex', ao."orderIndex"
+                   )
+                   ORDER BY ao."orderIndex"
+                 ) FILTER (WHERE ao.id IS NOT NULL),
+                 '[]'::json
+               ) AS options
         FROM StudentAnswers sa
         JOIN Questions q ON sa.questionId = q.id
+        LEFT JOIN AnswerOptions ao ON ao."questionId" = q.id
         WHERE sa.submissionId = @id
-      `, { id });
+        GROUP BY sa.id, q.id
+      `,
+        { id },
+      );
 
-      submission.answers = answers.recordset.map(a => ({
+      submission.answers = answers.recordset.map((a) => ({
         ...a,
-        options: a.options ? JSON.parse(a.options) : [],
+        options: a.options || [],
         selectedOptionIds: a.selectedOptionIds ? JSON.parse(a.selectedOptionIds) : [],
       }));
     }

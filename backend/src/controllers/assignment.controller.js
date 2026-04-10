@@ -1,4 +1,4 @@
-const { query, sql, getPool } = require("../config/database");
+const { query, withTransaction } = require("../config/database");
 
 // GET /api/assignments/course/:courseId
 const getAssignmentsByCourse = async (req, res) => {
@@ -9,7 +9,7 @@ const getAssignmentsByCourse = async (req, res) => {
     let whereClause = "WHERE a.courseEnrollmentId = @courseId";
     if (role === "student") {
       whereClause +=
-        " AND a.isPublished = 1 AND (a.startDate IS NULL OR a.startDate <= GETDATE())";
+        " AND a.isPublished = true AND (a.startDate IS NULL OR a.startDate <= NOW())";
     }
 
     const result = await query(
@@ -21,7 +21,7 @@ const getAssignmentsByCourse = async (req, res) => {
         u.fullName AS teacherName,
         (SELECT COUNT(*) FROM Questions WHERE assignmentId = a.id) AS questionCount,
         (SELECT COUNT(*) FROM Submissions WHERE assignmentId = a.id AND studentId = @userId) AS mySubmissions,
-        (SELECT TOP 1 score FROM Submissions WHERE assignmentId = a.id AND studentId = @userId AND status = 'graded' ORDER BY submittedAt DESC) AS myScore
+        (SELECT score FROM Submissions WHERE assignmentId = a.id AND studentId = @userId AND status = 'graded' ORDER BY submittedAt DESC LIMIT 1) AS myScore
       FROM Assignments a
       JOIN CourseEnrollments ce ON a.courseEnrollmentId = ce.id
       JOIN Subjects s ON ce.subjectId = s.id
@@ -68,28 +68,32 @@ const getAssignment = async (req, res) => {
     if (assignment.type === "quiz") {
       const questionsResult = await query(
         `
-  SELECT q.*, 
-    (
-      SELECT 
-        ao.id,
-        ao.optionText,
-        ao.orderIndex
-        ${role === "teacher" ? ", ao.isCorrect" : ""}
-      FROM AnswerOptions ao
-      WHERE ao.questionId = q.id
-      ORDER BY ao.orderIndex
-      FOR JSON PATH
+  SELECT
+    q.*,
+    COALESCE(
+      json_agg(
+        json_build_object(
+          'id', ao.id,
+          'optionText', ao."optionText",
+          'orderIndex', ao."orderIndex"
+          ${role === "teacher" ? ", 'isCorrect', ao.\"isCorrect\"" : ""}
+        )
+        ORDER BY ao."orderIndex"
+      ) FILTER (WHERE ao.id IS NOT NULL),
+      '[]'::json
     ) AS options
   FROM Questions q
-  WHERE q.assignmentId = @id
-  ORDER BY q.orderIndex
+  LEFT JOIN AnswerOptions ao ON ao."questionId" = q.id
+  WHERE q."assignmentId" = @id
+  GROUP BY q.id
+  ORDER BY q."orderIndex"
 `,
         { id },
       );
 
       assignment.questions = questionsResult.recordset.map((q) => ({
         ...q,
-        options: q.options ? JSON.parse(q.options) : [],
+        options: q.options || [],
       }));
     }
 
@@ -118,91 +122,97 @@ const createAssignment = async (req, res) => {
       questions,
     } = req.body;
 
-    const pool = await getPool();
-    const transaction = new sql.Transaction(pool);
-    await transaction.begin();
-
-    try {
-      // Verify teacher owns this course
-      const courseCheck = await new sql.Request(transaction)
-        .input("courseId", courseEnrollmentId)
-        .input("teacherId", req.user.id)
-        .query(
-          "SELECT id FROM CourseEnrollments WHERE id = @courseId AND teacherId = @teacherId",
-        );
+    const assignment = await withTransaction(async (client) => {
+      const courseCheck = await query(
+        `SELECT id FROM CourseEnrollments WHERE id = @courseId AND teacherId = @teacherId`,
+        { courseId: courseEnrollmentId, teacherId: req.user.id },
+        client,
+      );
 
       if (!courseCheck.recordset.length) {
-        await transaction.rollback();
-        return res
-          .status(403)
-          .json({ error: "You do not have access to this course" });
+        const e = new Error("Access denied");
+        e.status = 403;
+        throw e;
       }
 
-      // Create assignment
-      const assignmentResult = await new sql.Request(transaction)
-        .input("courseEnrollmentId", courseEnrollmentId)
-        .input("title", title)
-        .input("description", description || null)
-        .input("type", type)
-        .input("dueDate", dueDate ? new Date(dueDate) : null)
-        .input("startDate", startDate ? new Date(startDate) : null)
-        .input("timeLimitMinutes", timeLimitMinutes || null)
-        .input("totalPoints", totalPoints || 10)
-        .input("maxAttempts", maxAttempts || 1)
-        .input("shuffleQuestions", shuffleQuestions ? 1 : 0)
-        .input("showResultImmediately", showResultImmediately !== false ? 1 : 0)
-        .query(`
+      const assignmentResult = await query(
+        `
           INSERT INTO Assignments (courseEnrollmentId, title, description, type, dueDate, startDate,
             timeLimitMinutes, totalPoints, maxAttempts, shuffleQuestions, showResultImmediately)
-          OUTPUT INSERTED.*
           VALUES (@courseEnrollmentId, @title, @description, @type, @dueDate, @startDate,
             @timeLimitMinutes, @totalPoints, @maxAttempts, @shuffleQuestions, @showResultImmediately)
-        `);
+          RETURNING *
+        `,
+        {
+          courseEnrollmentId,
+          title,
+          description: description || null,
+          type,
+          dueDate: dueDate ? new Date(dueDate) : null,
+          startDate: startDate ? new Date(startDate) : null,
+          timeLimitMinutes: timeLimitMinutes || null,
+          totalPoints: totalPoints || 10,
+          maxAttempts: maxAttempts || 1,
+          shuffleQuestions: !!shuffleQuestions,
+          showResultImmediately: showResultImmediately !== false,
+        },
+        client,
+      );
 
-      const assignment = assignmentResult.recordset[0];
+      const createdAssignment = assignmentResult.recordset[0];
 
-      // Create questions if quiz
       if (type === "quiz" && questions && questions.length > 0) {
         for (let qi = 0; qi < questions.length; qi++) {
           const q = questions[qi];
-          const questionResult = await new sql.Request(transaction)
-            .input("assignmentId", assignment.id)
-            .input("questionText", q.questionText)
-            .input("questionType", q.questionType)
-            .input("points", q.points || 1)
-            .input("orderIndex", qi)
-            .input("explanation", q.explanation || null).query(`
+          const questionResult = await query(
+            `
               INSERT INTO Questions (assignmentId, questionText, questionType, points, orderIndex, explanation)
-              OUTPUT INSERTED.id
               VALUES (@assignmentId, @questionText, @questionType, @points, @orderIndex, @explanation)
-            `);
+              RETURNING id
+            `,
+            {
+              assignmentId: createdAssignment.id,
+              questionText: q.questionText,
+              questionType: q.questionType,
+              points: q.points || 1,
+              orderIndex: qi,
+              explanation: q.explanation || null,
+            },
+            client,
+          );
 
           const questionId = questionResult.recordset[0].id;
 
           if (q.options && q.options.length > 0) {
             for (let oi = 0; oi < q.options.length; oi++) {
               const opt = q.options[oi];
-              await new sql.Request(transaction)
-                .input("questionId", questionId)
-                .input("optionText", opt.optionText)
-                .input("isCorrect", opt.isCorrect ? 1 : 0)
-                .input("orderIndex", oi).query(`
+              await query(
+                `
                   INSERT INTO AnswerOptions (questionId, optionText, isCorrect, orderIndex)
                   VALUES (@questionId, @optionText, @isCorrect, @orderIndex)
-                `);
+                `,
+                {
+                  questionId,
+                  optionText: opt.optionText,
+                  isCorrect: !!opt.isCorrect,
+                  orderIndex: oi,
+                },
+                client,
+              );
             }
           }
         }
       }
 
-      await transaction.commit();
-      res.status(201).json(assignment);
-    } catch (err) {
-      await transaction.rollback();
-      throw err;
-    }
+      return createdAssignment;
+    });
+
+    res.status(201).json(assignment);
   } catch (err) {
     console.error(err);
+    if (err.status === 403) {
+      return res.status(403).json({ error: "You do not have access to this course" });
+    }
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -249,8 +259,8 @@ const updateAssignment = async (req, res) => {
         maxAttempts = COALESCE(@maxAttempts, maxAttempts),
         shuffleQuestions = COALESCE(@shuffleQuestions, shuffleQuestions),
         showResultImmediately = COALESCE(@showResultImmediately, showResultImmediately),
-        updatedAt = GETDATE()
-      OUTPUT INSERTED.*
+        updatedAt = NOW()
+      RETURNING *
       WHERE id = @id
     `,
       {
@@ -263,13 +273,9 @@ const updateAssignment = async (req, res) => {
         totalPoints,
         maxAttempts,
         shuffleQuestions:
-          shuffleQuestions !== undefined ? (shuffleQuestions ? 1 : 0) : null,
+          shuffleQuestions !== undefined ? !!shuffleQuestions : null,
         showResultImmediately:
-          showResultImmediately !== undefined
-            ? showResultImmediately
-              ? 1
-              : 0
-            : null,
+          showResultImmediately !== undefined ? !!showResultImmediately : null,
       },
     );
 
@@ -302,11 +308,11 @@ const publishAssignment = async (req, res) => {
       `
       UPDATE Assignments SET 
         isPublished = @published,
-        publishedAt = CASE WHEN @published = 1 THEN GETDATE() ELSE NULL END,
-        updatedAt = GETDATE()
+        publishedAt = CASE WHEN @published THEN NOW() ELSE NULL END,
+        updatedAt = NOW()
       WHERE id = @id
     `,
-      { id, published: publish ? 1 : 0 },
+      { id, published: !!publish },
     );
 
     res.json({

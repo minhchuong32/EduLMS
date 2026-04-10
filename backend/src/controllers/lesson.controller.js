@@ -6,7 +6,7 @@ const getLessonsByCourse = async (req, res) => {
     const { courseId } = req.params;
     const { role } = req.user;
     let whereClause = "WHERE l.courseEnrollmentId = @courseId";
-    if (role === "student") whereClause += " AND l.isPublished = 1";
+    if (role === "student") whereClause += " AND l.isPublished = true";
 
     const result = await query(
       `
@@ -88,7 +88,7 @@ const createLesson = async (req, res) => {
     const result = await query(
       `
       INSERT INTO Lessons (courseEnrollmentId, title, content, fileUrl, videoUrl, orderIndex)
-      OUTPUT INSERTED.*
+      RETURNING *
       VALUES (@courseEnrollmentId, @title, @content, @fileUrl, @videoUrl, @orderIndex)
     `,
       {
@@ -136,8 +136,8 @@ const updateLesson = async (req, res) => {
         ${fileUrl !== undefined ? "fileUrl = @fileUrl," : ""}
         videoUrl = COALESCE(@videoUrl, videoUrl),
         orderIndex = COALESCE(@orderIndex, orderIndex),
-        updatedAt = GETDATE()
-      OUTPUT INSERTED.*
+        updatedAt = NOW()
+      RETURNING *
       WHERE id = @id
     `,
       { id, title, content, fileUrl: fileUrl || null, videoUrl, orderIndex },
@@ -170,10 +170,11 @@ const publishLesson = async (req, res) => {
       `
       UPDATE Lessons SET 
         isPublished = @pub,
-        publishedAt = CASE WHEN @pub = 1 THEN GETDATE() ELSE NULL END
+        publishedAt = CASE WHEN @pub THEN NOW() ELSE NULL END,
+        updatedAt = NOW()
       WHERE id = @id
     `,
-      { id, pub: publish ? 1 : 0 },
+      { id, pub: !!publish },
     );
 
     res.json({ message: `Lesson ${publish ? "published" : "unpublished"}` });
@@ -213,7 +214,7 @@ const addComment = async (req, res) => {
     const result = await query(
       `
       INSERT INTO Comments (lessonId, authorId, content, parentId)
-      OUTPUT INSERTED.*
+      RETURNING *
       VALUES (@lessonId, @authorId, @content, @parentId)
     `,
       {

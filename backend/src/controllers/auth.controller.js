@@ -22,7 +22,7 @@ const login = async (req, res) => {
     }
 
     const result = await query(
-      'SELECT * FROM Users WHERE email = @email AND isActive = 1',
+      'SELECT * FROM Users WHERE email = @email AND isActive = true',
       { email: email.toLowerCase() }
     );
 
@@ -74,7 +74,7 @@ const refresh = async (req, res) => {
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
 
     const tokenResult = await query(
-      'SELECT * FROM RefreshTokens WHERE token = @token AND expiresAt > GETDATE()',
+      'SELECT * FROM RefreshTokens WHERE token = @token AND expiresAt > NOW()',
       { token: refreshToken }
     );
 
@@ -138,7 +138,7 @@ const changePassword = async (req, res) => {
 
     const newHash = await bcrypt.hash(newPassword, 12);
     await query(
-      'UPDATE Users SET passwordHash = @hash, updatedAt = GETDATE() WHERE id = @id',
+      'UPDATE Users SET passwordHash = @hash, updatedAt = NOW() WHERE id = @id',
       { hash: newHash, id: userId }
     );
 

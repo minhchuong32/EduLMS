@@ -1,76 +1,65 @@
-const sql = require('mssql');
-require('dotenv').config();
+const { Pool } = require("pg");
+require("dotenv").config();
 
-const config = {
-  server: process.env.DB_SERVER || 'localhost',
-  port: parseInt(process.env.DB_PORT) || 1433,
-  database: process.env.DB_NAME || 'LMS_DB',
-  user: process.env.DB_USER || 'sa',
-  password: process.env.DB_PASSWORD,
-  options: {
-    encrypt: process.env.DB_ENCRYPT === 'true',
-    trustServerCertificate: process.env.DB_TRUST_CERT === 'true',
-    enableArithAbort: true,
-  },
-  pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000,
-  },
-};
+const DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL) {
+  throw new Error("Missing DATABASE_URL (PostgreSQL connection string).");
+}
 
-let pool = null;
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  ssl:
+    process.env.PG_SSL === "true"
+      ? { rejectUnauthorized: false }
+      : undefined,
+  max: parseInt(process.env.PG_POOL_MAX || "10", 10),
+  idleTimeoutMillis: 30000,
+});
 
-const getPool = async () => {
-  if (!pool) {
-    pool = await sql.connect(config);
-    console.log('Connected to SQL Server');
+const replaceNamedParams = (text, params) => {
+  if (!params || Array.isArray(params)) {
+    return { text, values: params || [] };
   }
-  return pool;
-};
 
-const query = async (queryString, params = {}) => {
-  const pool = await getPool();
-  const request = pool.request();
-  Object.entries(params).forEach(([key, value]) => {
-    request.input(key, value);
+  const keys = Object.keys(params);
+  if (keys.length === 0) return { text, values: [] };
+
+  let out = text;
+  const values = [];
+  keys.forEach((key, i) => {
+    out = out.replace(new RegExp(`@${key}\\b`, "g"), `$${i + 1}`);
+    values.push(params[key]);
   });
-  return request.query(queryString);
+  return { text: out, values };
 };
 
-const closePool = async () => {
-  if (pool) {
-    await pool.close();
-    pool = null;
+// Keep MSSQL-like return shape: { recordset, rowsAffected }
+const query = async (text, params = {}, client = null) => {
+  const { text: q, values } = replaceNamedParams(text, params);
+  const runner = client || pool;
+  const result = await runner.query(q, values);
+  return { recordset: result.rows, rowsAffected: [result.rowCount] };
+};
+
+const withTransaction = async (fn) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const out = await fn(client);
+    await client.query("COMMIT");
+    return out;
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (_) {}
+    throw err;
+  } finally {
+    client.release();
   }
 };
 
-module.exports = { sql, getPool, query, closePool, config };
+const getPool = async () => pool;
 
-// const { Pool } = require("pg");
-// require("dotenv").config();
+const closePool = async () => pool.end();
 
-// const pool = new Pool({
-//   connectionString: process.env.DATABASE_URL,
-//   ssl: { rejectUnauthorized: false },
-//   max: 10,
-//   idleTimeoutMillis: 30000,
-// });
-
-// // query() hỗ trợ cả @param (cũ) và $1 (mới)
-// const query = async (text, params = {}) => {
-//   if (!params || Array.isArray(params)) {
-//     return pool.query(text, params || []);
-//   }
-//   // Chuyển @key → $1, $2...
-//   const keys = Object.keys(params);
-//   let sql = text;
-//   const values = [];
-//   keys.forEach((key, i) => {
-//     sql = sql.replace(new RegExp(`@${key}\\b`, "g"), `$${i + 1}`);
-//     values.push(params[key]);
-//   });
-//   return pool.query(sql, values);
-// };
-
-// module.exports = { query, pool };
+module.exports = { pool, getPool, query, withTransaction, closePool };

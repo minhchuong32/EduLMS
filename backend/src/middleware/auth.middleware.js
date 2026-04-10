@@ -21,7 +21,7 @@ const authenticate = async (req, res, next) => {
     }
 
     const user = result.recordset[0];
-    if (!user.isActive) {
+    if (user.isActive !== true) {
       return res.status(403).json({ error: 'Account is deactivated' });
     }
 

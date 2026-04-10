@@ -156,13 +156,13 @@ const seed = async () => {
     });
     if (exists.recordset.length > 0) {
       await query(
-        "UPDATE Users SET passwordHash = @hash, updatedAt = GETDATE() WHERE email = @email",
+        "UPDATE Users SET passwordHash = @hash, updatedAt = NOW() WHERE email = @email",
         { hash: u.hash, email: u.email },
       );
       updated++;
     } else {
       await query(
-        `INSERT INTO Users (fullName, email, passwordHash, role, phone, isActive) VALUES (@name, @email, @hash, @role, @phone, 1)`,
+        `INSERT INTO Users (fullName, email, passwordHash, role, phone, isActive) VALUES (@name, @email, @hash, @role, @phone, true)`,
         {
           name: u.name,
           email: u.email,
@@ -190,7 +190,9 @@ const seed = async () => {
   ];
   for (const s of subjects) {
     await query(
-      `IF NOT EXISTS (SELECT * FROM Subjects WHERE code = @code) INSERT INTO Subjects (name, code) VALUES (@name, @code)`,
+      `INSERT INTO Subjects (name, code)
+       VALUES (@name, @code)
+       ON CONFLICT (code) DO NOTHING`,
       s,
     );
   }
@@ -206,7 +208,9 @@ const seed = async () => {
   ];
   for (const c of classes) {
     await query(
-      `IF NOT EXISTS (SELECT * FROM Classes WHERE name = @name AND academicYear = @year) INSERT INTO Classes (name, gradeLevel, academicYear) VALUES (@name, @grade, @year)`,
+      `INSERT INTO Classes (name, gradeLevel, academicYear)
+       VALUES (@name, @grade, @year)
+       ON CONFLICT DO NOTHING`,
       c,
     );
   }

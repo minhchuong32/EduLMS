@@ -15,7 +15,7 @@ const getUsers = async (req, res) => {
       SELECT id, fullName, email, role, avatar, phone, isActive, createdAt
       FROM Users ${where}
       ORDER BY createdAt DESC
-      OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY
+      OFFSET @offset LIMIT @limit
     `, params);
 
     const count = await query(`SELECT COUNT(*) AS total FROM Users ${where}`, params);
@@ -40,8 +40,8 @@ const createUser = async (req, res) => {
     const hash = await bcrypt.hash(password || 'School@123', 12);
     const result = await query(`
       INSERT INTO Users (fullName, email, passwordHash, role, phone, dateOfBirth, gender)
-      OUTPUT INSERTED.id, INSERTED.fullName, INSERTED.email, INSERTED.role
       VALUES (@fullName, @email, @hash, @role, @phone, @dateOfBirth, @gender)
+      RETURNING id, fullName, email, role
     `, { fullName, email: email.toLowerCase(), hash, role, phone: phone || null, dateOfBirth: dateOfBirth || null, gender: gender || null });
     res.status(201).json(result.recordset[0]);
   } catch (err) {
@@ -65,9 +65,9 @@ const updateUser = async (req, res) => {
         address = COALESCE(@address, address),
         ${avatar !== undefined ? 'avatar = @avatar,' : ''}
         ${isActive !== undefined ? 'isActive = @isActive,' : ''}
-        updatedAt = GETDATE()
+        updatedAt = NOW()
       WHERE id = @id
-    `, { id, fullName, phone, dateOfBirth, gender, address, avatar: avatar || null, isActive: isActive !== undefined ? (isActive ? 1 : 0) : null });
+    `, { id, fullName, phone, dateOfBirth, gender, address, avatar: avatar || null, isActive: isActive !== undefined ? !!isActive : null });
 
     const result = await query('SELECT id, fullName, email, role, avatar FROM Users WHERE id = @id', { id });
     res.json(result.recordset[0]);
@@ -116,7 +116,7 @@ const getClassById = async (req, res) => {
       FROM CourseEnrollments ce
       JOIN Subjects s ON ce.subjectId = s.id
       JOIN Users u ON ce.teacherId = u.id
-      WHERE ce.classId = @id AND ce.isActive = 1
+      WHERE ce.classId = @id AND ce.isActive = true
     `, { id });
 
     res.json({ ...classResult.recordset[0], students: students.recordset, courses: courses.recordset });
@@ -128,7 +128,8 @@ const createClass = async (req, res) => {
     const { name, gradeLevel, academicYear, description } = req.body;
     const result = await query(`
       INSERT INTO Classes (name, gradeLevel, academicYear, description)
-      OUTPUT INSERTED.* VALUES (@name, @gradeLevel, @academicYear, @description)
+      VALUES (@name, @gradeLevel, @academicYear, @description)
+      RETURNING *
     `, { name, gradeLevel, academicYear, description: description || null });
     res.status(201).json(result.recordset[0]);
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
@@ -141,8 +142,8 @@ const updateClass = async (req, res) => {
     await query(`
       UPDATE Classes SET name = COALESCE(@name, name), gradeLevel = COALESCE(@gradeLevel, gradeLevel),
         academicYear = COALESCE(@academicYear, academicYear), description = COALESCE(@description, description),
-        isActive = COALESCE(@isActive, isActive), updatedAt = GETDATE() WHERE id = @id
-    `, { id, name, gradeLevel, academicYear, description, isActive: isActive !== undefined ? (isActive ? 1 : 0) : null });
+        isActive = COALESCE(@isActive, isActive), updatedAt = NOW() WHERE id = @id
+    `, { id, name, gradeLevel, academicYear, description, isActive: isActive !== undefined ? !!isActive : null });
     res.json({ message: 'Class updated' });
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 };
@@ -152,8 +153,9 @@ const addStudentToClass = async (req, res) => {
     const { id } = req.params;
     const { studentId } = req.body;
     await query(`
-      IF NOT EXISTS (SELECT * FROM StudentClasses WHERE studentId = @sid AND classId = @cid)
-      INSERT INTO StudentClasses (studentId, classId) VALUES (@sid, @cid)
+      INSERT INTO StudentClasses (studentId, classId)
+      VALUES (@sid, @cid)
+      ON CONFLICT (studentId, classId) DO NOTHING
     `, { sid: studentId, cid: id });
     res.json({ message: 'Student added to class' });
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
@@ -170,7 +172,7 @@ const removeStudentFromClass = async (req, res) => {
 // ==================== SUBJECT CONTROLLER ====================
 const getSubjects = async (req, res) => {
   try {
-    const result = await query('SELECT * FROM Subjects WHERE isActive = 1 ORDER BY name');
+    const result = await query('SELECT * FROM Subjects WHERE isActive = true ORDER BY name');
     res.json(result.recordset);
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 };
@@ -179,8 +181,9 @@ const createSubject = async (req, res) => {
   try {
     const { name, code, description } = req.body;
     const result = await query(`
-      INSERT INTO Subjects (name, code, description) OUTPUT INSERTED.*
+      INSERT INTO Subjects (name, code, description)
       VALUES (@name, @code, @description)
+      RETURNING *
     `, { name, code, description: description || null });
     res.status(201).json(result.recordset[0]);
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
@@ -192,8 +195,8 @@ const updateSubject = async (req, res) => {
     const { name, description, isActive } = req.body;
     await query(`
       UPDATE Subjects SET name = COALESCE(@name, name), description = COALESCE(@description, description),
-        isActive = COALESCE(@isActive, isActive), updatedAt = GETDATE() WHERE id = @id
-    `, { id, name, description, isActive: isActive !== undefined ? (isActive ? 1 : 0) : null });
+        isActive = COALESCE(@isActive, isActive), updatedAt = NOW() WHERE id = @id
+    `, { id, name, description, isActive: isActive !== undefined ? !!isActive : null });
     res.json({ message: 'Subject updated' });
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 };
@@ -203,7 +206,7 @@ const getCourses = async (req, res) => {
   try {
     const { role, id: userId } = req.user;
     const { classId } = req.query;
-    let where = 'WHERE ce.isActive = 1';
+    let where = 'WHERE ce.isActive = true';
     const params = {};
 
     if (role === 'teacher') { where += ' AND ce.teacherId = @userId'; params.userId = userId; }
@@ -217,8 +220,8 @@ const getCourses = async (req, res) => {
       SELECT ce.*, s.name AS subjectName, s.code AS subjectCode, s.thumbnail,
              u.fullName AS teacherName, u.avatar AS teacherAvatar,
              c.name AS className, c.gradeLevel,
-             (SELECT COUNT(*) FROM Lessons WHERE courseEnrollmentId = ce.id AND isPublished = 1) AS lessonCount,
-             (SELECT COUNT(*) FROM Assignments WHERE courseEnrollmentId = ce.id AND isPublished = 1) AS assignmentCount
+             (SELECT COUNT(*) FROM Lessons WHERE courseEnrollmentId = ce.id AND isPublished = true) AS lessonCount,
+             (SELECT COUNT(*) FROM Assignments WHERE courseEnrollmentId = ce.id AND isPublished = true) AS assignmentCount
       FROM CourseEnrollments ce
       JOIN Subjects s ON ce.subjectId = s.id
       JOIN Users u ON ce.teacherId = u.id
@@ -253,7 +256,8 @@ const createCourse = async (req, res) => {
     const { teacherId, subjectId, classId, semester, academicYear } = req.body;
     const result = await query(`
       INSERT INTO CourseEnrollments (teacherId, subjectId, classId, semester, academicYear)
-      OUTPUT INSERTED.* VALUES (@teacherId, @subjectId, @classId, @semester, @academicYear)
+      VALUES (@teacherId, @subjectId, @classId, @semester, @academicYear)
+      RETURNING *
     `, { teacherId, subjectId, classId, semester, academicYear });
     res.status(201).json(result.recordset[0]);
   } catch (err) {
@@ -268,7 +272,7 @@ const getAnnouncements = async (req, res) => {
     const { courseId } = req.query;
     const { role, id: userId } = req.user;
     const params = {};
-    let where = 'WHERE (a.isGlobal = 1';
+    let where = 'WHERE (a.isGlobal = true';
 
     if (role === 'student') {
       where += ` OR a.courseEnrollmentId IN (
@@ -299,11 +303,12 @@ const createAnnouncement = async (req, res) => {
     const { courseEnrollmentId, title, content, isGlobal } = req.body;
     const result = await query(`
       INSERT INTO Announcements (courseEnrollmentId, authorId, title, content, isGlobal)
-      OUTPUT INSERTED.* VALUES (@courseId, @authorId, @title, @content, @isGlobal)
+      VALUES (@courseId, @authorId, @title, @content, @isGlobal)
+      RETURNING *
     `, {
       courseId: courseEnrollmentId || null,
       authorId: req.user.id, title, content,
-      isGlobal: isGlobal && req.user.role === 'admin' ? 1 : 0,
+      isGlobal: !!(isGlobal && req.user.role === 'admin'),
     });
     res.status(201).json(result.recordset[0]);
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
@@ -326,7 +331,7 @@ const deleteAnnouncement = async (req, res) => {
 const getNotifications = async (req, res) => {
   try {
     const result = await query(`
-      SELECT TOP 50 * FROM Notifications WHERE userId = @userId ORDER BY createdAt DESC
+      SELECT * FROM Notifications WHERE userId = @userId ORDER BY createdAt DESC LIMIT 50
     `, { userId: req.user.id });
     res.json(result.recordset);
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
@@ -346,10 +351,10 @@ const getDashboard = async (req, res) => {
 
     if (role === 'admin') {
       const [users, classes, subjects, courses] = await Promise.all([
-        query('SELECT role, COUNT(*) AS cnt FROM Users WHERE isActive = 1 GROUP BY role'),
-        query('SELECT COUNT(*) AS cnt FROM Classes WHERE isActive = 1'),
-        query('SELECT COUNT(*) AS cnt FROM Subjects WHERE isActive = 1'),
-        query('SELECT COUNT(*) AS cnt FROM CourseEnrollments WHERE isActive = 1'),
+        query('SELECT role, COUNT(*) AS cnt FROM Users WHERE isActive = true GROUP BY role'),
+        query('SELECT COUNT(*) AS cnt FROM Classes WHERE isActive = true'),
+        query('SELECT COUNT(*) AS cnt FROM Subjects WHERE isActive = true'),
+        query('SELECT COUNT(*) AS cnt FROM CourseEnrollments WHERE isActive = true'),
       ]);
       res.json({
         usersByRole: users.recordset,
@@ -372,8 +377,8 @@ const getDashboard = async (req, res) => {
       });
     } else {
       const [courses, assignments, completed] = await Promise.all([
-        query(`SELECT COUNT(*) AS cnt FROM CourseEnrollments ce JOIN StudentClasses sc ON ce.classId = sc.classId WHERE sc.studentId = @id AND ce.isActive = 1`, { id: userId }),
-        query(`SELECT COUNT(*) AS cnt FROM Assignments a JOIN CourseEnrollments ce ON a.courseEnrollmentId = ce.id JOIN StudentClasses sc ON ce.classId = sc.classId WHERE sc.studentId = @id AND a.isPublished = 1`, { id: userId }),
+        query(`SELECT COUNT(*) AS cnt FROM CourseEnrollments ce JOIN StudentClasses sc ON ce.classId = sc.classId WHERE sc.studentId = @id AND ce.isActive = true`, { id: userId }),
+        query(`SELECT COUNT(*) AS cnt FROM Assignments a JOIN CourseEnrollments ce ON a.courseEnrollmentId = ce.id JOIN StudentClasses sc ON ce.classId = sc.classId WHERE sc.studentId = @id AND a.isPublished = true`, { id: userId }),
         query(`SELECT COUNT(*) AS cnt FROM Submissions WHERE studentId = @id AND status IN ('submitted','graded')`, { id: userId }),
       ]);
       res.json({

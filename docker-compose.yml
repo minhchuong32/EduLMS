@@ -1,34 +1,17 @@
-version: "3.8"
-
 services:
-  sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: lms-sqlserver
+  postgres:
+    image: postgres:16-alpine
+    container_name: lms-postgres
     environment:
-      - ACCEPT_EULA=Y
-      - MSSQL_SA_PASSWORD=Edulmsdb2026!
-      - MSSQL_PID=Express
+      - POSTGRES_DB=lms
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
     ports:
-      - "1433:1433"
+      - "5432:5432"
     volumes:
-      - sqlserver_data:/var/opt/mssql
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test:
-        [
-          "CMD",
-          "/opt/mssql-tools/bin/sqlcmd",
-          "-S",
-          "localhost",
-          "-U",
-          "sa",
-          "-P",
-          "Edulmsdb2026!",
-          "-Q",
-          "SELECT 1",
-          "-b",
-          "-o",
-          "/dev/null",
-        ]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lms"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -38,16 +21,32 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: lms-backend
-    restart: always
     ports:
       - "5000:5000"
-    env_file:
-      - ./backend/.env # Lệnh này giúp Docker nạp toàn bộ biến từ file .env vào
-    depends_on:
-      sqlserver:
-        condition: service_healthy # Chỉ chạy backend khi database đã sẵn sàng hoàn toàn
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/lms
+      - PG_SSL=false
+      - JWT_SECRET=change_me_super_secret_key
+      - JWT_REFRESH_SECRET=change_me_refresh_secret
+      - FRONTEND_URL=http://localhost:3000
     volumes:
-      - ./backend/uploads:/app/uploads # Để lưu file bài giảng không bị mất khi restart
+      - uploads_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: lms-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
 
 volumes:
-  sqlserver_data:
+  postgres_data:
+  uploads_data:
