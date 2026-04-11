@@ -93,11 +93,24 @@ const replaceNamedParams = (text, params) => {
   const keys = Object.keys(params);
   if (keys.length === 0) return { text, values: [] };
 
+  // Only bind params that appear in the SQL, in order of first occurrence.
+  // Otherwise optional fragments (e.g. no `avatar = @avatar`) leave gaps like $1..$6,$8 and break pg.
+  const ordered = keys
+    .map((key) => {
+      const re = new RegExp(`@${key}\\b`);
+      const pos = text.search(re);
+      if (pos < 0) return null;
+      return { key, pos };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.pos - b.pos);
+
   let out = text;
   const values = [];
-  keys.forEach((key, i) => {
+  ordered.forEach(({ key }, i) => {
     out = out.replace(new RegExp(`@${key}\\b`, "g"), `$${i + 1}`);
-    values.push(params[key]);
+    const v = params[key];
+    values.push(v === undefined ? null : v);
   });
   return { text: out, values };
 };
