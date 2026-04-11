@@ -1,4 +1,4 @@
-const { query, closePool } = require("./database");
+const { query, closePool, withTransaction } = require("./database");
 require("dotenv").config();
 
 const migrate = async () => {
@@ -76,6 +76,70 @@ const migrate = async () => {
         UNIQUE (teacherId, subjectId, classId, academicYear)
       );
     `);
+
+    // Merge duplicate classes (same name + khối + năm học), then enforce uniqueness for seed/API.
+    await withTransaction(async (client) => {
+      await query(
+        `
+        DO $dedupe$
+        BEGIN
+          CREATE TEMP TABLE _class_dedupe ON COMMIT DROP AS
+          WITH keeper AS (
+            SELECT DISTINCT ON (name, gradelevel, academicyear)
+              id AS keeper_id, name, gradelevel, academicyear
+            FROM classes
+            ORDER BY name, gradelevel, academicyear, createdat ASC NULLS LAST, id ASC
+          ),
+          dups AS (
+            SELECT c.id AS dup_id, k.keeper_id
+            FROM classes c
+            INNER JOIN keeper k ON c.name = k.name AND c.gradelevel = k.gradelevel AND c.academicyear = k.academicyear
+            WHERE c.id <> k.keeper_id
+          )
+          SELECT dup_id, keeper_id FROM dups;
+
+          IF EXISTS (SELECT 1 FROM _class_dedupe LIMIT 1) THEN
+            DELETE FROM studentclasses sc
+            USING _class_dedupe d
+            WHERE sc.classid = d.dup_id
+              AND EXISTS (
+                SELECT 1 FROM studentclasses x
+                WHERE x.studentid = sc.studentid AND x.classid = d.keeper_id
+              );
+
+            UPDATE studentclasses sc SET classid = d.keeper_id
+            FROM _class_dedupe d
+            WHERE sc.classid = d.dup_id;
+
+            DELETE FROM courseenrollments ce
+            USING _class_dedupe d
+            WHERE ce.classid = d.dup_id
+              AND EXISTS (
+                SELECT 1 FROM courseenrollments x
+                WHERE x.teacherid = ce.teacherid AND x.subjectid = ce.subjectid AND x.classid = d.keeper_id
+                  AND (x.academicyear IS NOT DISTINCT FROM ce.academicyear)
+              );
+
+            UPDATE courseenrollments ce SET classid = d.keeper_id
+            FROM _class_dedupe d
+            WHERE ce.classid = d.dup_id;
+
+            DELETE FROM classes c
+            USING _class_dedupe d
+            WHERE c.id = d.dup_id;
+          END IF;
+        END
+        $dedupe$;
+        `,
+        {},
+        client,
+      );
+      await query(
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_classes_name_grade_year ON classes (name, gradelevel, academicyear);`,
+        {},
+        client,
+      );
+    });
 
     await query(`
       CREATE TABLE IF NOT EXISTS lessons (

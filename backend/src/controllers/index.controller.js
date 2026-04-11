@@ -108,12 +108,12 @@ const updateUser = async (req, res) => {
     `,
       {
         id,
-        fullName,
-        phone,
-        dateOfBirth,
-        gender,
-        address,
-        avatar: avatar || null,
+        fullName: fullName ?? null,
+        phone: phone ?? null,
+        dateOfBirth: dateOfBirth ?? null,
+        gender: gender ?? null,
+        address: address ?? null,
+        avatar: avatar ?? null,
         isActive: isActive !== undefined ? !!isActive : null,
       },
     );
@@ -214,6 +214,11 @@ const createClass = async (req, res) => {
     );
     res.status(201).json(result.recordset[0]);
   } catch (err) {
+    if (err.code === "23505") {
+      return res.status(409).json({
+        error: "Đã tồn tại lớp cùng tên, khối và năm học",
+      });
+    }
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -239,6 +244,11 @@ const updateClass = async (req, res) => {
     );
     res.json({ message: "Class updated" });
   } catch (err) {
+    if (err.code === "23505") {
+      return res.status(409).json({
+        error: "Đã tồn tại lớp cùng tên, khối và năm học",
+      });
+    }
     res.status(500).json({ error: "Server error" });
   }
 };

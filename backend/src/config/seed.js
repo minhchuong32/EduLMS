@@ -210,7 +210,7 @@ const seed = async () => {
     await query(
       `INSERT INTO Classes (name, gradeLevel, academicYear)
        VALUES (@name, @grade, @year)
-       ON CONFLICT DO NOTHING`,
+       ON CONFLICT (name, gradelevel, academicyear) DO NOTHING`,
       c,
     );
   }

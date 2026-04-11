@@ -22,7 +22,7 @@ const NAV_ITEMS = {
     { to: "/classes", icon: AcademicCapIcon, label: "Lớp học" },
     { to: "/users", icon: UsersIcon, label: "Người dùng" },
     { to: "/announcements", icon: MegaphoneIcon, label: "Bảng tin" },
-    { to: "/notifications", icon: BellIcon, label: "Thông báo hệ thống demo" },
+    { to: "/notifications", icon: BellIcon, label: "Thông báo hệ thống" },
   ],
   teacher: [
     { to: "/dashboard", icon: HomeIcon, label: "Tổng quan" },
