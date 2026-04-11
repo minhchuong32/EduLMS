@@ -1,15 +1,15 @@
-import axios from 'axios';
+import axios from "axios";
 
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
 const api = axios.create({
   baseURL: API_BASE,
-  headers: { 'Content-Type': 'application/json' },
+  headers: { "Content-Type": "application/json" },
 });
 
 // Request interceptor - attach token
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('accessToken');
+  const token = localStorage.getItem("accessToken");
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
@@ -19,7 +19,9 @@ let isRefreshing = false;
 let failedQueue = [];
 
 const processQueue = (error, token = null) => {
-  failedQueue.forEach(prom => error ? prom.reject(error) : prom.resolve(token));
+  failedQueue.forEach((prom) =>
+    error ? prom.reject(error) : prom.resolve(token),
+  );
   failedQueue = [];
 };
 
@@ -31,7 +33,7 @@ api.interceptors.response.use(
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
-        }).then(token => {
+        }).then((token) => {
           originalRequest.headers.Authorization = `Bearer ${token}`;
           return api(originalRequest);
         });
@@ -39,77 +41,87 @@ api.interceptors.response.use(
       originalRequest._retry = true;
       isRefreshing = true;
 
-      const refreshToken = localStorage.getItem('refreshToken');
+      const refreshToken = localStorage.getItem("refreshToken");
       if (!refreshToken) {
         isRefreshing = false;
-        window.location.href = '/login';
+        window.location.href = "/login";
         return Promise.reject(error);
       }
 
       try {
-        const { data } = await axios.post(`${API_BASE}/auth/refresh`, { refreshToken });
-        localStorage.setItem('accessToken', data.accessToken);
-        localStorage.setItem('refreshToken', data.refreshToken);
+        const { data } = await axios.post(`${API_BASE}/auth/refresh`, {
+          refreshToken,
+        });
+        localStorage.setItem("accessToken", data.accessToken);
+        localStorage.setItem("refreshToken", data.refreshToken);
         processQueue(null, data.accessToken);
         originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
         return api(originalRequest);
       } catch (err) {
         processQueue(err, null);
         localStorage.clear();
-        window.location.href = '/login';
+        window.location.href = "/login";
         return Promise.reject(err);
       } finally {
         isRefreshing = false;
       }
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 // Auth
 export const authApi = {
-  login: (data) => api.post('/auth/login', data),
-  logout: (data) => api.post('/auth/logout', data),
-  getMe: () => api.get('/auth/me'),
-  changePassword: (data) => api.put('/auth/change-password', data),
+  login: (data) => api.post("/auth/login", data),
+  logout: (data) => api.post("/auth/logout", data),
+  getMe: () => api.get("/auth/me"),
+  changePassword: (data) => api.put("/auth/change-password", data),
 };
 
 // Users
 export const userApi = {
-  getAll: (params) => api.get('/users', { params }),
+  getAll: (params) => api.get("/users", { params }),
   getById: (id) => api.get(`/users/${id}`),
-  create: (data) => api.post('/users', data),
+  create: (data) => api.post("/users", data),
   update: (id, data) => api.put(`/users/${id}`, data),
   delete: (id) => api.delete(`/users/${id}`),
   updateProfile: (data) => {
     const formData = new FormData();
-    Object.entries(data).forEach(([k, v]) => v !== undefined && formData.append(k, v));
-    return api.put('/users/profile', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+    Object.entries(data).forEach(
+      ([k, v]) => v !== undefined && formData.append(k, v),
+    );
+    return api.put("/users/profile", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
   },
 };
 
 // Classes
 export const classApi = {
-  getAll: (params) => api.get('/classes', { params }),
+  getAll: (params) => api.get("/classes", { params }),
   getById: (id) => api.get(`/classes/${id}`),
-  create: (data) => api.post('/classes', data),
+  create: (data) => api.post("/classes", data),
   update: (id, data) => api.put(`/classes/${id}`, data),
-  addStudent: (classId, studentId) => api.post(`/classes/${classId}/students`, { studentId }),
-  removeStudent: (classId, studentId) => api.delete(`/classes/${classId}/students/${studentId}`),
+  addStudent: (classId, studentId) =>
+    api.post(`/classes/${classId}/students`, { studentId }),
+  removeStudent: (classId, studentId) =>
+    api.delete(`/classes/${classId}/students/${studentId}`),
 };
 
 // Subjects
 export const subjectApi = {
-  getAll: () => api.get('/subjects'),
-  create: (data) => api.post('/subjects', data),
+  getAll: () => api.get("/subjects"),
+  create: (data) => api.post("/subjects", data),
   update: (id, data) => api.put(`/subjects/${id}`, data),
 };
 
 // Courses
 export const courseApi = {
-  getAll: (params) => api.get('/courses', { params }),
+  getAll: (params) => api.get("/courses", { params }),
   getById: (id) => api.get(`/courses/${id}`),
-  create: (data) => api.post('/courses', data),
+  create: (data) => api.post("/courses", data),
+  update: (id, data) => api.put(`/courses/${id}`, data),
+  delete: (id) => api.delete(`/courses/${id}`),
 };
 
 // Lessons
@@ -118,13 +130,21 @@ export const lessonApi = {
   getById: (id) => api.get(`/lessons/${id}`),
   create: (data) => {
     const formData = new FormData();
-    Object.entries(data).forEach(([k, v]) => v !== undefined && v !== null && formData.append(k, v));
-    return api.post('/lessons', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+    Object.entries(data).forEach(
+      ([k, v]) => v !== undefined && v !== null && formData.append(k, v),
+    );
+    return api.post("/lessons", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
   },
   update: (id, data) => {
     const formData = new FormData();
-    Object.entries(data).forEach(([k, v]) => v !== undefined && formData.append(k, v));
-    return api.put(`/lessons/${id}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+    Object.entries(data).forEach(
+      ([k, v]) => v !== undefined && formData.append(k, v),
+    );
+    return api.put(`/lessons/${id}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
   },
   publish: (id, publish) => api.patch(`/lessons/${id}/publish`, { publish }),
   delete: (id) => api.delete(`/lessons/${id}`),
@@ -135,44 +155,49 @@ export const lessonApi = {
 export const assignmentApi = {
   getByCourse: (courseId) => api.get(`/assignments/course/${courseId}`),
   getById: (id) => api.get(`/assignments/${id}`),
-  create: (data) => api.post('/assignments', data),
+  create: (data) => api.post("/assignments", data),
   update: (id, data) => api.put(`/assignments/${id}`, data),
-  publish: (id, publish) => api.patch(`/assignments/${id}/publish`, { publish }),
+  publish: (id, publish) =>
+    api.patch(`/assignments/${id}/publish`, { publish }),
   delete: (id) => api.delete(`/assignments/${id}`),
 };
 
 // Submissions
 export const submissionApi = {
-  start: (assignmentId) => api.post('/submissions/start', { assignmentId }),
-  submitQuiz: (id, answers) => api.post(`/submissions/${id}/submit-quiz`, { answers }),
+  start: (assignmentId) => api.post("/submissions/start", { assignmentId }),
+  submitQuiz: (id, answers) =>
+    api.post(`/submissions/${id}/submit-quiz`, { answers }),
   submitEssay: (id, data) => {
     const formData = new FormData();
-    if (data.essayContent) formData.append('essayContent', data.essayContent);
-    if (data.file) formData.append('file', data.file);
-    return api.post(`/submissions/${id}/submit-essay`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+    if (data.essayContent) formData.append("essayContent", data.essayContent);
+    if (data.file) formData.append("file", data.file);
+    return api.post(`/submissions/${id}/submit-essay`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
   },
   grade: (id, data) => api.put(`/submissions/${id}/grade`, data),
-  getByAssignment: (assignmentId) => api.get(`/submissions/assignment/${assignmentId}`),
+  getByAssignment: (assignmentId) =>
+    api.get(`/submissions/assignment/${assignmentId}`),
   getMy: (assignmentId) => api.get(`/submissions/my/${assignmentId}`),
   getDetail: (id) => api.get(`/submissions/${id}/detail`),
 };
 
 // Announcements
 export const announcementApi = {
-  getAll: (params) => api.get('/announcements', { params }),
-  create: (data) => api.post('/announcements', data),
+  getAll: (params) => api.get("/announcements", { params }),
+  create: (data) => api.post("/announcements", data),
   delete: (id) => api.delete(`/announcements/${id}`),
 };
 
 // Notifications
 export const notificationApi = {
-  getAll: () => api.get('/notifications'),
-  markAllRead: () => api.put('/notifications/read-all'),
+  getAll: () => api.get("/notifications"),
+  markAllRead: () => api.put("/notifications/read-all"),
 };
 
 // Dashboard
 export const dashboardApi = {
-  get: () => api.get('/dashboard'),
+  get: () => api.get("/dashboard"),
 };
 
 export default api;

@@ -74,19 +74,19 @@ const getAssignment = async (req, res) => {
       json_agg(
         json_build_object(
           'id', ao.id,
-          'optionText', ao."optionText",
-          'orderIndex', ao."orderIndex"
-          ${role === "teacher" ? ", 'isCorrect', ao.\"isCorrect\"" : ""}
+          'optionText', ao.optiontext,
+          'orderIndex', ao.orderindex
+          ${role === "teacher" ? ", 'isCorrect', ao.iscorrect" : ""}
         )
-        ORDER BY ao."orderIndex"
+        ORDER BY ao.orderindex
       ) FILTER (WHERE ao.id IS NOT NULL),
       '[]'::json
     ) AS options
   FROM Questions q
-  LEFT JOIN AnswerOptions ao ON ao."questionId" = q.id
-  WHERE q."assignmentId" = @id
+  LEFT JOIN AnswerOptions ao ON ao.questionid = q.id
+  WHERE q.assignmentid = @id
   GROUP BY q.id
-  ORDER BY q."orderIndex"
+  ORDER BY q.orderindex
 `,
         { id },
       );
@@ -211,7 +211,9 @@ const createAssignment = async (req, res) => {
   } catch (err) {
     console.error(err);
     if (err.status === 403) {
-      return res.status(403).json({ error: "You do not have access to this course" });
+      return res
+        .status(403)
+        .json({ error: "You do not have access to this course" });
     }
     res.status(500).json({ error: "Server error" });
   }
@@ -260,8 +262,8 @@ const updateAssignment = async (req, res) => {
         shuffleQuestions = COALESCE(@shuffleQuestions, shuffleQuestions),
         showResultImmediately = COALESCE(@showResultImmediately, showResultImmediately),
         updatedAt = NOW()
-      RETURNING *
       WHERE id = @id
+      RETURNING *
     `,
       {
         id,
@@ -278,6 +280,10 @@ const updateAssignment = async (req, res) => {
           showResultImmediately !== undefined ? !!showResultImmediately : null,
       },
     );
+
+    if (!result.recordset.length) {
+      return res.status(404).json({ error: "Assignment not found" });
+    }
 
     res.json(result.recordset[0]);
   } catch (err) {

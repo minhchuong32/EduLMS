@@ -96,7 +96,9 @@ const updateUser = async (req, res) => {
     const { fullName, phone, dateOfBirth, gender, address } = req.body;
 
     const isActive =
-      isAdmin && req.body.isActive !== undefined ? !!req.body.isActive : undefined;
+      isAdmin && req.body.isActive !== undefined
+        ? !!req.body.isActive
+        : undefined;
     const email = isAdmin ? req.body.email : undefined;
     const role = isAdmin ? req.body.role : undefined;
 
@@ -150,10 +152,7 @@ const updateUser = async (req, res) => {
     if (passwordHash) params.passwordHash = passwordHash;
     if (isActive !== undefined) params.isActive = isActive;
 
-    await query(
-      `UPDATE Users SET ${sets.join(", ")} WHERE id = @id`,
-      params,
-    );
+    await query(`UPDATE Users SET ${sets.join(", ")} WHERE id = @id`, params);
 
     const result = await query(
       "SELECT id, fullName, email, role, avatar, phone, isActive FROM Users WHERE id = @id",
@@ -472,7 +471,7 @@ const getCourseById = async (req, res) => {
       JOIN Subjects s ON ce.subjectId = s.id
       JOIN Users u ON ce.teacherId = u.id
       JOIN Classes c ON ce.classId = c.id
-      WHERE ce.id = @id
+      WHERE ce.id = @id AND ce.isActive = true
     `,
       { id },
     );
@@ -487,6 +486,9 @@ const getCourseById = async (req, res) => {
 const createCourse = async (req, res) => {
   try {
     const { teacherId, subjectId, classId, semester, academicYear } = req.body;
+    if (!teacherId || !subjectId || !classId || !academicYear) {
+      return res.status(400).json({ error: "Thiếu thông tin khóa học" });
+    }
     const result = await query(
       `
       INSERT INTO CourseEnrollments (teacherId, subjectId, classId, semester, academicYear)
@@ -499,6 +501,74 @@ const createCourse = async (req, res) => {
   } catch (err) {
     if (err.message.includes("UNIQUE"))
       return res.status(400).json({ error: "Course already exists" });
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+const updateCourse = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { teacherId, subjectId, classId, semester, academicYear } = req.body;
+
+    if (!teacherId || !subjectId || !classId || !academicYear) {
+      return res.status(400).json({ error: "Thiếu thông tin khóa học" });
+    }
+
+    const result = await query(
+      `
+      UPDATE CourseEnrollments
+      SET teacherId = @teacherId,
+          subjectId = @subjectId,
+          classId = @classId,
+          semester = @semester,
+          academicYear = @academicYear,
+          updatedAt = NOW()
+      WHERE id = @id AND isActive = true
+      RETURNING *
+    `,
+      {
+        id,
+        teacherId,
+        subjectId,
+        classId,
+        semester: semester || null,
+        academicYear,
+      },
+    );
+
+    if (!result.recordset.length) {
+      return res.status(404).json({ error: "Course not found" });
+    }
+
+    res.json(result.recordset[0]);
+  } catch (err) {
+    if (err.code === "23505") {
+      return res.status(409).json({ error: "Course already exists" });
+    }
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+const deleteCourse = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await query(
+      `
+      UPDATE CourseEnrollments
+      SET isActive = false,
+          updatedAt = NOW()
+      WHERE id = @id AND isActive = true
+      RETURNING id
+    `,
+      { id },
+    );
+
+    if (!result.recordset.length) {
+      return res.status(404).json({ error: "Course not found" });
+    }
+
+    res.json({ message: "Course deleted" });
+  } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -710,6 +780,8 @@ module.exports = {
   getCourses,
   getCourseById,
   createCourse,
+  updateCourse,
+  deleteCourse,
   // Announcements
   getAnnouncements,
   createAnnouncement,

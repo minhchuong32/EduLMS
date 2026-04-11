@@ -88,8 +88,8 @@ const createLesson = async (req, res) => {
     const result = await query(
       `
       INSERT INTO Lessons (courseEnrollmentId, title, content, fileUrl, videoUrl, orderIndex)
-      RETURNING *
       VALUES (@courseEnrollmentId, @title, @content, @fileUrl, @videoUrl, @orderIndex)
+      RETURNING *
     `,
       {
         courseEnrollmentId,
@@ -137,8 +137,8 @@ const updateLesson = async (req, res) => {
         videoUrl = COALESCE(@videoUrl, videoUrl),
         orderIndex = COALESCE(@orderIndex, orderIndex),
         updatedAt = NOW()
-      RETURNING *
       WHERE id = @id
+      RETURNING *
     `,
       { id, title, content, fileUrl: fileUrl || null, videoUrl, orderIndex },
     );
@@ -211,16 +211,20 @@ const addComment = async (req, res) => {
     const { id } = req.params;
     const { content, parentId } = req.body;
 
+    if (!content || !String(content).trim()) {
+      return res.status(400).json({ error: "Comment content is required" });
+    }
+
     const result = await query(
       `
       INSERT INTO Comments (lessonId, authorId, content, parentId)
-      RETURNING *
       VALUES (@lessonId, @authorId, @content, @parentId)
+      RETURNING *
     `,
       {
         lessonId: id,
         authorId: req.user.id,
-        content,
+        content: String(content).trim(),
         parentId: parentId || null,
       },
     );

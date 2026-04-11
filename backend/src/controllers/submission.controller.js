@@ -9,29 +9,35 @@ const startSubmission = async (req, res) => {
     // Check assignment
     const assignmentResult = await query(
       "SELECT * FROM Assignments WHERE id = @id AND isPublished = true",
-      { id: assignmentId }
+      { id: assignmentId },
     );
     if (!assignmentResult.recordset.length) {
-      return res.status(404).json({ error: 'Assignment not found or not published' });
+      return res
+        .status(404)
+        .json({ error: "Assignment not found or not published" });
     }
 
     const assignment = assignmentResult.recordset[0];
 
     // Check attempt count
     const attemptResult = await query(
-      'SELECT COUNT(*) AS cnt FROM Submissions WHERE assignmentId = @aid AND studentId = @sid AND status != @s',
-      { aid: assignmentId, sid: studentId, s: 'in_progress' }
+      "SELECT COUNT(*) AS cnt FROM Submissions WHERE assignmentId = @aid AND studentId = @sid AND status != @s",
+      { aid: assignmentId, sid: studentId, s: "in_progress" },
     );
     const attempts = attemptResult.recordset[0].cnt;
 
     if (attempts >= assignment.maxAttempts) {
-      return res.status(400).json({ error: `Maximum attempts (${assignment.maxAttempts}) reached` });
+      return res
+        .status(400)
+        .json({
+          error: `Maximum attempts (${assignment.maxAttempts}) reached`,
+        });
     }
 
     // Check if in_progress submission exists
     const existing = await query(
       "SELECT * FROM Submissions WHERE assignmentId = @aid AND studentId = @sid AND status = 'in_progress'",
-      { aid: assignmentId, sid: studentId }
+      { aid: assignmentId, sid: studentId },
     );
     if (existing.recordset.length) {
       return res.json(existing.recordset[0]);
@@ -49,7 +55,7 @@ const startSubmission = async (req, res) => {
     res.status(201).json(result.recordset[0]);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -62,11 +68,13 @@ const submitQuiz = async (req, res) => {
 
     const submissionResult = await query(
       "SELECT s.*, a.totalPoints, a.showResultImmediately FROM Submissions s JOIN Assignments a ON s.assignmentId = a.id WHERE s.id = @id AND s.studentId = @sid AND s.status = 'in_progress'",
-      { id, sid: studentId }
+      { id, sid: studentId },
     );
 
     if (!submissionResult.recordset.length) {
-      return res.status(404).json({ error: 'Submission not found or already submitted' });
+      return res
+        .status(404)
+        .json({ error: "Submission not found or already submitted" });
     }
 
     const submission = submissionResult.recordset[0];
@@ -78,14 +86,14 @@ const submitQuiz = async (req, res) => {
         q.id, q.questionType, q.points,
         COALESCE(
           json_agg(
-            json_build_object('id', ao.id, 'isCorrect', ao."isCorrect")
-            ORDER BY ao."orderIndex"
+            json_build_object('id', ao.id, 'isCorrect', ao.iscorrect)
+            ORDER BY ao.orderindex
           ) FILTER (WHERE ao.id IS NOT NULL),
           '[]'::json
         ) AS options
       FROM Questions q
-      LEFT JOIN AnswerOptions ao ON ao."questionId" = q.id
-      WHERE q."assignmentId" = @aid
+      LEFT JOIN AnswerOptions ao ON ao.questionid = q.id
+      WHERE q.assignmentid = @aid
       GROUP BY q.id
     `,
       { aid: submission.assignmentId },
@@ -115,7 +123,9 @@ const submitQuiz = async (req, res) => {
           question.questionType === "single_choice" ||
           question.questionType === "true_false"
         ) {
-          isCorrect = selectedIds.length === 1 && correctOptionIds.includes(selectedIds[0]);
+          isCorrect =
+            selectedIds.length === 1 &&
+            correctOptionIds.includes(selectedIds[0]);
           pointsEarned = isCorrect ? question.points : 0;
         } else if (question.questionType === "multiple_choice") {
           const correctSet = new Set(correctOptionIds);
@@ -144,7 +154,8 @@ const submitQuiz = async (req, res) => {
         );
       }
 
-      const finalScore = maxScore > 0 ? (totalScore / maxScore) * submission.totalPoints : 0;
+      const finalScore =
+        maxScore > 0 ? (totalScore / maxScore) * submission.totalPoints : 0;
       const roundedScore = Math.round(finalScore * 100) / 100;
 
       await query(
@@ -174,7 +185,7 @@ const submitQuiz = async (req, res) => {
     }
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -184,18 +195,23 @@ const submitEssay = async (req, res) => {
     const { id } = req.params;
     const { essayContent } = req.body;
     const studentId = req.user.id;
-    const fileUrl = req.file ? `/uploads/submissions/${req.file.filename}` : null;
+    const fileUrl = req.file
+      ? `/uploads/submissions/${req.file.filename}`
+      : null;
 
     const result = await query(
       "SELECT * FROM Submissions WHERE id = @id AND studentId = @sid AND status = 'in_progress'",
-      { id, sid: studentId }
+      { id, sid: studentId },
     );
 
     if (!result.recordset.length) {
-      return res.status(404).json({ error: 'Submission not found' });
+      return res.status(404).json({ error: "Submission not found" });
     }
 
-    const assignmentResult = await query('SELECT dueDate FROM Assignments WHERE id = @id', { id: result.recordset[0].assignmentId });
+    const assignmentResult = await query(
+      "SELECT dueDate FROM Assignments WHERE id = @id",
+      { id: result.recordset[0].assignmentId },
+    );
     const dueDate = assignmentResult.recordset[0].dueDate;
     const isLate = dueDate && new Date() > new Date(dueDate);
 
@@ -208,12 +224,17 @@ const submitEssay = async (req, res) => {
         status = @status
       WHERE id = @id
     `,
-      { id, content: essayContent || null, fileUrl, status: isLate ? "late" : "submitted" },
+      {
+        id,
+        content: essayContent || null,
+        fileUrl,
+        status: isLate ? "late" : "submitted",
+      },
     );
 
-    res.json({ message: 'Essay submitted successfully', isLate });
+    res.json({ message: "Essay submitted successfully", isLate });
   } catch (err) {
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -238,7 +259,10 @@ const gradeSubmission = async (req, res) => {
     );
 
     // Send notification to student
-    const subResult = await query('SELECT studentId, assignmentId FROM Submissions WHERE id = @id', { id });
+    const subResult = await query(
+      "SELECT studentId, assignmentId FROM Submissions WHERE id = @id",
+      { id },
+    );
     if (subResult.recordset.length) {
       const { studentId, assignmentId } = subResult.recordset[0];
       await query(
@@ -250,9 +274,9 @@ const gradeSubmission = async (req, res) => {
       );
     }
 
-    res.json({ message: 'Graded successfully' });
+    res.json({ message: "Graded successfully" });
   } catch (err) {
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -261,17 +285,20 @@ const getSubmissionsByAssignment = async (req, res) => {
   try {
     const { assignmentId } = req.params;
 
-    const result = await query(`
+    const result = await query(
+      `
       SELECT s.*, u.fullName AS studentName, u.avatar AS studentAvatar
       FROM Submissions s
       JOIN Users u ON s.studentId = u.id
       WHERE s.assignmentId = @assignmentId
       ORDER BY s.submittedAt DESC
-    `, { assignmentId });
+    `,
+      { assignmentId },
+    );
 
     res.json(result.recordset);
   } catch (err) {
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -280,7 +307,8 @@ const getSubmissionDetail = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await query(`
+    const result = await query(
+      `
       SELECT s.*, u.fullName AS studentName,
              a.title AS assignmentTitle, a.type AS assignmentType,
              a.totalPoints
@@ -288,15 +316,17 @@ const getSubmissionDetail = async (req, res) => {
       JOIN Users u ON s.studentId = u.id
       JOIN Assignments a ON s.assignmentId = a.id
       WHERE s.id = @id
-    `, { id });
+    `,
+      { id },
+    );
 
     if (!result.recordset.length) {
-      return res.status(404).json({ error: 'Submission not found' });
+      return res.status(404).json({ error: "Submission not found" });
     }
 
     const submission = result.recordset[0];
 
-    if (submission.assignmentType === 'quiz') {
+    if (submission.assignmentType === "quiz") {
       const answers = await query(
         `
         SELECT sa.*, q.questionText, q.questionType, q.points AS questionPoints, q.explanation,
@@ -304,18 +334,18 @@ const getSubmissionDetail = async (req, res) => {
                  json_agg(
                    json_build_object(
                      'id', ao.id,
-                     'optionText', ao."optionText",
-                     'isCorrect', ao."isCorrect",
-                     'orderIndex', ao."orderIndex"
+                     'optionText', ao.optiontext,
+                     'isCorrect', ao.iscorrect,
+                     'orderIndex', ao.orderindex
                    )
-                   ORDER BY ao."orderIndex"
+                   ORDER BY ao.orderindex
                  ) FILTER (WHERE ao.id IS NOT NULL),
                  '[]'::json
                ) AS options
         FROM StudentAnswers sa
         JOIN Questions q ON sa.questionId = q.id
-        LEFT JOIN AnswerOptions ao ON ao."questionId" = q.id
-        WHERE sa.submissionId = @id
+        LEFT JOIN AnswerOptions ao ON ao.questionid = q.id
+        WHERE sa.submissionid = @id
         GROUP BY sa.id, q.id
       `,
         { id },
@@ -324,13 +354,15 @@ const getSubmissionDetail = async (req, res) => {
       submission.answers = answers.recordset.map((a) => ({
         ...a,
         options: a.options || [],
-        selectedOptionIds: a.selectedOptionIds ? JSON.parse(a.selectedOptionIds) : [],
+        selectedOptionIds: a.selectedOptionIds
+          ? JSON.parse(a.selectedOptionIds)
+          : [],
       }));
     }
 
     res.json(submission);
   } catch (err) {
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -341,13 +373,13 @@ const getMySubmission = async (req, res) => {
     const studentId = req.user.id;
 
     const result = await query(
-      'SELECT * FROM Submissions WHERE assignmentId = @aid AND studentId = @sid ORDER BY attemptNumber DESC',
-      { aid: assignmentId, sid: studentId }
+      "SELECT * FROM Submissions WHERE assignmentId = @aid AND studentId = @sid ORDER BY attemptNumber DESC",
+      { aid: assignmentId, sid: studentId },
     );
 
     res.json(result.recordset);
   } catch (err) {
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
