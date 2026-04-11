@@ -4,13 +4,18 @@ const bcrypt = require("bcryptjs");
 // ==================== USER CONTROLLER ====================
 const getUsers = async (req, res) => {
   try {
-    const { role, search, page = 1, limit = 20 } = req.query;
+    const { role, search } = req.query;
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(
+      100,
+      Math.max(1, parseInt(req.query.limit, 10) || 10),
+    );
     const offset = (page - 1) * limit;
     let where = "WHERE 1=1";
     const filterParams = {};
     const paginationParams = {
-      offset: parseInt(offset),
-      limit: parseInt(limit),
+      offset,
+      limit,
     };
     if (role) {
       where += " AND role = @role";
@@ -87,43 +92,120 @@ const createUser = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { fullName, phone, dateOfBirth, gender, address, isActive } =
-      req.body;
+    const isAdmin = req.user.role === "admin";
+    const { fullName, phone, dateOfBirth, gender, address } = req.body;
+
+    const isActive =
+      isAdmin && req.body.isActive !== undefined ? !!req.body.isActive : undefined;
+    const email = isAdmin ? req.body.email : undefined;
+    const role = isAdmin ? req.body.role : undefined;
+
+    let passwordHash = null;
+    if (isAdmin && req.body.password && String(req.body.password).trim()) {
+      passwordHash = await bcrypt.hash(String(req.body.password).trim(), 12);
+    }
+
+    if (role !== undefined && role !== null && role !== "") {
+      if (!["admin", "teacher", "student"].includes(role)) {
+        return res.status(400).json({ error: "Vai trò không hợp lệ" });
+      }
+    }
+
     const avatar = req.file
       ? `/uploads/avatars/${req.file.filename}`
       : undefined;
 
+    const sets = [
+      "fullName = COALESCE(@fullName, fullName)",
+      "phone = COALESCE(@phone, phone)",
+      "dateOfBirth = COALESCE(@dateOfBirth, dateOfBirth)",
+      "gender = COALESCE(@gender, gender)",
+      "address = COALESCE(@address, address)",
+    ];
+    if (avatar !== undefined) sets.push("avatar = @avatar");
+    if (isAdmin && email !== undefined)
+      sets.push("email = COALESCE(@email, email)");
+    if (isAdmin && role !== undefined && role !== null && role !== "")
+      sets.push("role = COALESCE(@role, role)");
+    if (passwordHash) sets.push("passwordHash = @passwordHash");
+    if (isActive !== undefined) sets.push("isActive = @isActive");
+    sets.push("updatedAt = NOW()");
+
+    const params = {
+      id,
+      fullName: fullName ?? null,
+      phone: phone ?? null,
+      dateOfBirth: dateOfBirth ?? null,
+      gender: gender ?? null,
+      address: address ?? null,
+    };
+    if (avatar !== undefined) params.avatar = avatar;
+    if (isAdmin && email !== undefined) {
+      const em = String(email).toLowerCase().trim();
+      if (!em) return res.status(400).json({ error: "Email không hợp lệ" });
+      params.email = em;
+    }
+    if (isAdmin && role !== undefined && role !== null && role !== "")
+      params.role = role;
+    if (passwordHash) params.passwordHash = passwordHash;
+    if (isActive !== undefined) params.isActive = isActive;
+
     await query(
-      `
-      UPDATE Users SET
-        fullName = COALESCE(@fullName, fullName),
-        phone = COALESCE(@phone, phone),
-        dateOfBirth = COALESCE(@dateOfBirth, dateOfBirth),
-        gender = COALESCE(@gender, gender),
-        address = COALESCE(@address, address),
-        ${avatar !== undefined ? "avatar = @avatar," : ""}
-        ${isActive !== undefined ? "isActive = @isActive," : ""}
-        updatedAt = NOW()
-      WHERE id = @id
-    `,
-      {
-        id,
-        fullName: fullName ?? null,
-        phone: phone ?? null,
-        dateOfBirth: dateOfBirth ?? null,
-        gender: gender ?? null,
-        address: address ?? null,
-        avatar: avatar ?? null,
-        isActive: isActive !== undefined ? !!isActive : null,
-      },
+      `UPDATE Users SET ${sets.join(", ")} WHERE id = @id`,
+      params,
     );
 
     const result = await query(
-      "SELECT id, fullName, email, role, avatar FROM Users WHERE id = @id",
+      "SELECT id, fullName, email, role, avatar, phone, isActive FROM Users WHERE id = @id",
       { id },
     );
     res.json(result.recordset[0]);
   } catch (err) {
+    if (err.code === "23505") {
+      return res.status(409).json({ error: "Email đã được sử dụng" });
+    }
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (req.user.id === id) {
+      return res
+        .status(400)
+        .json({ error: "Không thể xóa tài khoản của chính bạn" });
+    }
+
+    const target = await query("SELECT role FROM Users WHERE id = @id", { id });
+    if (!target.recordset.length)
+      return res.status(404).json({ error: "Không tìm thấy người dùng" });
+
+    if (target.recordset[0].role === "admin") {
+      const admins = await query(
+        "SELECT COUNT(*)::int AS c FROM Users WHERE role = @role",
+        { role: "admin" },
+      );
+      if (admins.recordset[0].c <= 1) {
+        return res.status(400).json({
+          error: "Không thể xóa quản trị viên cuối cùng",
+        });
+      }
+    }
+
+    const del = await query("DELETE FROM Users WHERE id = @id RETURNING id", {
+      id,
+    });
+    if (!del.recordset.length)
+      return res.status(404).json({ error: "Không tìm thấy người dùng" });
+    res.json({ message: "Đã xóa tài khoản" });
+  } catch (err) {
+    if (err.code === "23503") {
+      return res.status(409).json({
+        error:
+          "Không thể xóa: còn dữ liệu liên quan (khóa học, bài nộp…). Có thể khóa tài khoản thay vì xóa.",
+      });
+    }
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -611,6 +693,7 @@ module.exports = {
   getUserById,
   createUser,
   updateUser,
+  deleteUser,
   updateProfile,
   // Classes
   getClasses,

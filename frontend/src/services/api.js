@@ -80,6 +80,7 @@ export const userApi = {
   getById: (id) => api.get(`/users/${id}`),
   create: (data) => api.post('/users', data),
   update: (id, data) => api.put(`/users/${id}`, data),
+  delete: (id) => api.delete(`/users/${id}`),
   updateProfile: (data) => {
     const formData = new FormData();
     Object.entries(data).forEach(([k, v]) => v !== undefined && formData.append(k, v));
