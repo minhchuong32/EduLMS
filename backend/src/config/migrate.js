@@ -235,6 +235,7 @@ const migrate = async () => {
       CREATE TABLE IF NOT EXISTS announcements (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         courseEnrollmentId uuid REFERENCES courseenrollments(id),
+        classId uuid REFERENCES classes(id),
         authorId uuid NOT NULL REFERENCES users(id),
         title varchar(300) NOT NULL,
         content text NOT NULL,
@@ -242,6 +243,16 @@ const migrate = async () => {
         createdAt timestamptz NOT NULL DEFAULT now(),
         updatedAt timestamptz NOT NULL DEFAULT now()
       );
+    `);
+
+    await query(`
+      ALTER TABLE announcements
+      ADD COLUMN IF NOT EXISTS classid uuid REFERENCES classes(id);
+    `);
+
+    await query(`
+      ALTER TABLE announcements
+      ADD COLUMN IF NOT EXISTS updatedat timestamptz NOT NULL DEFAULT now();
     `);
 
     await query(`

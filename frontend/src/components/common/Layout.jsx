@@ -5,7 +5,6 @@ import {
   HomeIcon,
   BookOpenIcon,
   AcademicCapIcon,
-  BellIcon,
   MegaphoneIcon,
   ChevronLeftIcon,
   Bars3Icon,
@@ -15,26 +14,27 @@ import {
 } from "@heroicons/react/24/outline";
 import { toast } from "react-toastify";
 
+const FILE_BASE_URL = (
+  process.env.REACT_APP_API_URL || "http://localhost:5000/api"
+).replace(/\/api\/?$/, "");
+
 const NAV_ITEMS = {
   admin: [
     { to: "/dashboard", icon: HomeIcon, label: "Tổng quan" },
     { to: "/courses", icon: BookOpenIcon, label: "Khóa học" },
     { to: "/classes", icon: AcademicCapIcon, label: "Lớp học" },
     { to: "/users", icon: UsersIcon, label: "Người dùng" },
-    { to: "/announcements", icon: MegaphoneIcon, label: "Bảng tin" },
-    { to: "/notifications", icon: BellIcon, label: "Thông báo hệ thống" },
+    { to: "/announcements", icon: MegaphoneIcon, label: "Thông báo hệ thống" },
   ],
   teacher: [
     { to: "/dashboard", icon: HomeIcon, label: "Tổng quan" },
     { to: "/courses", icon: BookOpenIcon, label: "Môn học" },
     { to: "/classes", icon: AcademicCapIcon, label: "Lớp học" },
-    { to: "/announcements", icon: MegaphoneIcon, label: "Bảng tin" },
-    { to: "/notifications", icon: BellIcon, label: "Thông báo hệ thống" },
+    { to: "/announcements", icon: MegaphoneIcon, label: "Thông báo hệ thống" },
   ],
   student: [
     { to: "/dashboard", icon: HomeIcon, label: "Tổng quan" },
     { to: "/courses", icon: BookOpenIcon, label: "Môn học" },
-    { to: "/announcements", icon: MegaphoneIcon, label: "Bảng tin" },
   ],
 };
 
@@ -138,7 +138,7 @@ export default function Layout() {
           >
             {user?.avatar ? (
               <img
-                src={`http://localhost:5000${user.avatar}`}
+                src={`${FILE_BASE_URL}${user.avatar}`}
                 alt="avatar"
                 className="w-8 h-8 rounded-full object-cover flex-shrink-0"
               />

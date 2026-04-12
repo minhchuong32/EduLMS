@@ -60,6 +60,23 @@ const getUserById = async (req, res) => {
   }
 };
 
+const getProfile = async (req, res) => {
+  try {
+    const result = await query(
+      "SELECT id, fullName, email, role, avatar, phone, dateOfBirth, gender, address, isActive, createdAt FROM Users WHERE id = @id",
+      { id: req.user.id },
+    );
+
+    if (!result.recordset.length) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json(result.recordset[0]);
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
 const createUser = async (req, res) => {
   try {
     const { fullName, email, password, role, phone, dateOfBirth, gender } =
@@ -214,6 +231,20 @@ const updateProfile = async (req, res) => {
   return updateUser(req, res);
 };
 
+const teacherHasClassAccess = async (classId, teacherId) => {
+  const result = await query(
+    `
+    SELECT 1
+    FROM CourseEnrollments
+    WHERE classId = @classId AND teacherId = @teacherId AND isActive = true
+    LIMIT 1
+  `,
+    { classId, teacherId },
+  );
+
+  return result.recordset.length > 0;
+};
+
 // ==================== CLASS CONTROLLER ====================
 const getClasses = async (req, res) => {
   try {
@@ -225,11 +256,18 @@ const getClasses = async (req, res) => {
       params.academicYear = academicYear;
     }
 
+    if (req.user.role === "teacher") {
+      where +=
+        " AND EXISTS (SELECT 1 FROM CourseEnrollments ce WHERE ce.classId = c.id AND ce.teacherId = @teacherId AND ce.isActive = true)";
+      params.teacherId = req.user.id;
+    }
+
     const result = await query(
       `
       SELECT c.*, 
         (SELECT COUNT(*) FROM StudentClasses WHERE classId = c.id) AS studentCount
-      FROM Classes c ${where} ORDER BY c.gradeLevel, c.name
+      FROM Classes c
+      ${where} ORDER BY c.gradeLevel, c.name
     `,
       params,
     );
@@ -251,6 +289,13 @@ const getClassById = async (req, res) => {
     );
     if (!classResult.recordset.length)
       return res.status(404).json({ error: "Class not found" });
+
+    if (
+      req.user.role === "teacher" &&
+      !(await teacherHasClassAccess(id, req.user.id))
+    ) {
+      return res.status(403).json({ error: "Access denied" });
+    }
 
     const students = await query(
       `
@@ -285,13 +330,19 @@ const getClassById = async (req, res) => {
 const createClass = async (req, res) => {
   try {
     const { name, gradeLevel, academicYear, description } = req.body;
+
     const result = await query(
       `
       INSERT INTO Classes (name, gradeLevel, academicYear, description)
       VALUES (@name, @gradeLevel, @academicYear, @description)
       RETURNING *
     `,
-      { name, gradeLevel, academicYear, description: description || null },
+      {
+        name,
+        gradeLevel,
+        academicYear,
+        description: description || null,
+      },
     );
     res.status(201).json(result.recordset[0]);
   } catch (err) {
@@ -338,6 +389,14 @@ const addStudentToClass = async (req, res) => {
   try {
     const { id } = req.params;
     const { studentId } = req.body;
+
+    if (
+      req.user.role === "teacher" &&
+      !(await teacherHasClassAccess(id, req.user.id))
+    ) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
     await query(
       `
       INSERT INTO StudentClasses (studentId, classId)
@@ -355,6 +414,14 @@ const addStudentToClass = async (req, res) => {
 const removeStudentFromClass = async (req, res) => {
   try {
     const { id, studentId } = req.params;
+
+    if (
+      req.user.role === "teacher" &&
+      !(await teacherHasClassAccess(id, req.user.id))
+    ) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
     await query(
       "DELETE FROM StudentClasses WHERE classId = @cid AND studentId = @sid",
       { cid: id, sid: studentId },
@@ -576,33 +643,61 @@ const deleteCourse = async (req, res) => {
 // ==================== ANNOUNCEMENT CONTROLLER ====================
 const getAnnouncements = async (req, res) => {
   try {
-    const { courseId } = req.query;
+    const { courseId, classId } = req.query;
     const { role, id: userId } = req.user;
     const params = {};
-    let where = "WHERE (a.isGlobal = true";
+    const classColumnExists = await query(
+      `
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'announcements' AND column_name = 'classid'
+      LIMIT 1
+    `,
+    );
+    const supportsClassId = classColumnExists.recordset.length > 0;
 
-    if (role === "student") {
-      where += ` OR a.courseEnrollmentId IN (
-        SELECT ce.id FROM CourseEnrollments ce
-        JOIN StudentClasses sc ON ce.classId = sc.classId
-        WHERE sc.studentId = @userId)`;
-      params.userId = userId;
-    } else if (role === "teacher") {
-      where += ` OR a.courseEnrollmentId IN (SELECT id FROM CourseEnrollments WHERE teacherId = @userId)`;
-      params.userId = userId;
+    if (classId && !supportsClassId) {
+      return res.json([]);
     }
-    where += ")";
+
+    let where = "WHERE 1=1";
 
     if (courseId) {
       where += " AND a.courseEnrollmentId = @courseId";
       params.courseId = courseId;
+
+      if (role === "teacher") {
+        where +=
+          " AND a.courseEnrollmentId IN (SELECT id FROM CourseEnrollments WHERE teacherId = @userId AND isActive = true)";
+        params.userId = userId;
+      } else if (role === "student") {
+        where +=
+          " AND a.courseEnrollmentId IN (SELECT ce.id FROM CourseEnrollments ce JOIN StudentClasses sc ON ce.classId = sc.classId WHERE sc.studentId = @userId AND ce.isActive = true)";
+        params.userId = userId;
+      }
+    } else if (classId) {
+      where += " AND a.classId = @classId";
+      params.classId = classId;
+
+      if (role === "teacher") {
+        where +=
+          " AND a.classId IN (SELECT classId FROM CourseEnrollments WHERE teacherId = @userId AND isActive = true)";
+        params.userId = userId;
+      } else if (role === "student") {
+        where +=
+          " AND a.classId IN (SELECT classId FROM StudentClasses WHERE studentId = @userId)";
+        params.userId = userId;
+      }
+    } else {
+      where += " AND a.isGlobal = true";
     }
 
     const result = await query(
       `
       SELECT a.*, u.fullName AS authorName, u.avatar AS authorAvatar, u.role AS authorRole
       FROM Announcements a JOIN Users u ON a.authorId = u.id
-      ${where} ORDER BY a.createdAt DESC
+      ${where}
+      ORDER BY a.createdAt DESC
     `,
       params,
     );
@@ -615,22 +710,177 @@ const getAnnouncements = async (req, res) => {
 
 const createAnnouncement = async (req, res) => {
   try {
-    const { courseEnrollmentId, title, content, isGlobal } = req.body;
+    const { title, content, courseEnrollmentId, classId, isGlobal } = req.body;
+    const classColumnExists = await query(
+      `
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'announcements' AND column_name = 'classid'
+      LIMIT 1
+    `,
+    );
+    const supportsClassId = classColumnExists.recordset.length > 0;
+
+    if (req.user.role === "admin") {
+      const result = supportsClassId
+        ? await query(
+            `
+            INSERT INTO Announcements (courseEnrollmentId, classId, authorId, title, content, isGlobal)
+            VALUES (NULL, NULL, @authorId, @title, @content, true)
+            RETURNING *
+          `,
+            {
+              authorId: req.user.id,
+              title,
+              content,
+            },
+          )
+        : await query(
+            `
+            INSERT INTO Announcements (courseEnrollmentId, authorId, title, content, isGlobal)
+            VALUES (NULL, @authorId, @title, @content, true)
+            RETURNING *
+          `,
+            {
+              authorId: req.user.id,
+              title,
+              content,
+            },
+          );
+      return res.status(201).json(result.recordset[0]);
+    }
+
+    if (req.user.role !== "teacher") {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    if (isGlobal) {
+      return res.status(400).json({
+        error: "Giáo viên không thể đăng thông báo hệ thống",
+      });
+    }
+
+    const hasCourseTarget = !!courseEnrollmentId;
+    const hasClassTarget = !!classId;
+
+    if (hasCourseTarget === hasClassTarget) {
+      return res.status(400).json({
+        error: "Chỉ chọn một đích: môn học hoặc lớp học",
+      });
+    }
+
+    if (hasCourseTarget) {
+      const hasAccess = await query(
+        `
+        SELECT 1
+        FROM CourseEnrollments
+        WHERE id = @courseId AND teacherId = @teacherId AND isActive = true
+        LIMIT 1
+      `,
+        { courseId: courseEnrollmentId, teacherId: req.user.id },
+      );
+
+      if (!hasAccess.recordset.length) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const result = supportsClassId
+        ? await query(
+            `
+            INSERT INTO Announcements (courseEnrollmentId, classId, authorId, title, content, isGlobal)
+            VALUES (@courseId, NULL, @authorId, @title, @content, false)
+            RETURNING *
+          `,
+            {
+              courseId: courseEnrollmentId,
+              authorId: req.user.id,
+              title,
+              content,
+            },
+          )
+        : await query(
+            `
+            INSERT INTO Announcements (courseEnrollmentId, authorId, title, content, isGlobal)
+            VALUES (@courseId, @authorId, @title, @content, false)
+            RETURNING *
+          `,
+            {
+              courseId: courseEnrollmentId,
+              authorId: req.user.id,
+              title,
+              content,
+            },
+          );
+      return res.status(201).json(result.recordset[0]);
+    }
+
+    const classAccess = await query(
+      `
+      SELECT 1
+      FROM CourseEnrollments
+      WHERE classId = @classId AND teacherId = @teacherId AND isActive = true
+      LIMIT 1
+    `,
+      { classId, teacherId: req.user.id },
+    );
+
+    if (!classAccess.recordset.length) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const result = supportsClassId
+      ? await query(
+          `
+          INSERT INTO Announcements (courseEnrollmentId, classId, authorId, title, content, isGlobal)
+          VALUES (NULL, @classId, @authorId, @title, @content, false)
+          RETURNING *
+        `,
+          {
+            classId,
+            authorId: req.user.id,
+            title,
+            content,
+          },
+        )
+      : await query(
+          `
+          INSERT INTO Announcements (courseEnrollmentId, authorId, title, content, isGlobal)
+          VALUES (NULL, @authorId, @title, @content, false)
+          RETURNING *
+        `,
+          {
+            authorId: req.user.id,
+            title,
+            content,
+          },
+        );
+    res.status(201).json(result.recordset[0]);
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+const updateAnnouncement = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, content } = req.body;
+
     const result = await query(
       `
-      INSERT INTO Announcements (courseEnrollmentId, authorId, title, content, isGlobal)
-      VALUES (@courseId, @authorId, @title, @content, @isGlobal)
+      UPDATE Announcements
+      SET title = COALESCE(@title, title),
+          content = COALESCE(@content, content)
+      WHERE id = @id AND isGlobal = true
       RETURNING *
     `,
-      {
-        courseId: courseEnrollmentId || null,
-        authorId: req.user.id,
-        title,
-        content,
-        isGlobal: !!(isGlobal && req.user.role === "admin"),
-      },
+      { id, title, content },
     );
-    res.status(201).json(result.recordset[0]);
+
+    if (!result.recordset.length) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    res.json(result.recordset[0]);
   } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
@@ -640,20 +890,86 @@ const deleteAnnouncement = async (req, res) => {
   try {
     const { id } = req.params;
     const check = await query(
-      "SELECT authorId FROM Announcements WHERE id = @id",
+      "SELECT authorId, courseEnrollmentId, isGlobal FROM Announcements WHERE id = @id",
       { id },
     );
     if (!check.recordset.length)
       return res.status(404).json({ error: "Not found" });
-    if (
-      check.recordset[0].authorId !== req.user.id &&
-      req.user.role !== "admin"
-    ) {
+
+    const announcement = check.recordset[0];
+    const classColumnExists = await query(
+      `
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'announcements' AND column_name = 'classid'
+      LIMIT 1
+    `,
+    );
+
+    let announcementClassId = null;
+    if (classColumnExists.recordset.length) {
+      const classResult = await query(
+        "SELECT classId FROM Announcements WHERE id = @id",
+        { id },
+      );
+      announcementClassId = classResult.recordset[0]?.classId || null;
+    }
+
+    if (req.user.role === "admin") {
+      const deleted = await query(
+        "DELETE FROM Announcements WHERE id = @id RETURNING id",
+        { id },
+      );
+
+      if (!deleted.recordset.length) {
+        return res.status(404).json({ error: "Not found" });
+      }
+
+      return res.json({ message: "Deleted" });
+    }
+
+    if (req.user.role !== "teacher") {
       return res.status(403).json({ error: "Access denied" });
     }
-    await query("DELETE FROM Announcements WHERE id = @id", { id });
+
+    const ownsCourse = announcement.courseEnrollmentId
+      ? await query(
+          `
+        SELECT 1 FROM CourseEnrollments
+        WHERE id = @courseId AND teacherId = @teacherId AND isActive = true
+        LIMIT 1
+      `,
+          { courseId: announcement.courseEnrollmentId, teacherId: req.user.id },
+        )
+      : { recordset: [] };
+
+    const ownsClass = announcementClassId
+      ? await query(
+          `
+        SELECT 1 FROM CourseEnrollments
+        WHERE classId = @classId AND teacherId = @teacherId AND isActive = true
+        LIMIT 1
+      `,
+          { classId: announcementClassId, teacherId: req.user.id },
+        )
+      : { recordset: [] };
+
+    if (!ownsCourse.recordset.length && !ownsClass.recordset.length) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const deleted = await query(
+      "DELETE FROM Announcements WHERE id = @id RETURNING id",
+      { id },
+    );
+
+    if (!deleted.recordset.length) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
     res.json({ message: "Deleted" });
   } catch (err) {
+    console.error("deleteAnnouncement failed:", err);
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -761,6 +1077,7 @@ module.exports = {
   // Users
   getUsers,
   getUserById,
+  getProfile,
   createUser,
   updateUser,
   deleteUser,
@@ -785,6 +1102,7 @@ module.exports = {
   // Announcements
   getAnnouncements,
   createAnnouncement,
+  updateAnnouncement,
   deleteAnnouncement,
   // Notifications
   getNotifications,

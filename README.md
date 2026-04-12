@@ -15,6 +15,7 @@ EduLMS cung cấp một môi trường học tập trực tuyến hiện đại,
 - 🏫 Nhà trường quản lý toàn bộ hoạt động học tập tập trung
 
 Hệ thống hỗ trợ đầy đủ các nghiệp vụ cốt lõi:
+
 - Quản lý lớp học & môn học
 - Tổ chức bài giảng và tài liệu
 - Tạo và chấm bài tập (quiz & tự luận)
@@ -26,16 +27,19 @@ Hệ thống hỗ trợ đầy đủ các nghiệp vụ cốt lõi:
 ## 📸 Demo UI
 
 ### 🏠 Dashboard
+
 <p align="center">
   <img src="docs/images/dashboard.png" width="800"/>
 </p>
 
 ### 👨‍🏫 Teacher - Quản lý bài giảng
+
 <p align="center">
   <img src="docs/images/teacher-page.png" width="800"/>
 </p>
 
 ### 🧑‍🎓 Student - Làm bài trắc nghiệm
+
 <p align="center">
   <img src="docs/images/student-quiz.png" width="800"/>
 </p>
@@ -55,6 +59,7 @@ Hệ thống hỗ trợ đầy đủ các nghiệp vụ cốt lõi:
 ## 👥 Vai trò người dùng
 
 ### 🏫 Quản trị viên (Admin)
+
 - Quản lý người dùng (giáo viên, học sinh)
 - Tổ chức lớp học và môn học
 - Phân công giảng dạy
@@ -64,23 +69,25 @@ Hệ thống hỗ trợ đầy đủ các nghiệp vụ cốt lõi:
 ---
 
 ### 👨‍🏫 Giáo viên (Teacher)
-- Quản lý lớp và môn phụ trách  
-- Tạo & quản lý **bài giảng** (file, video)  
-- Tạo **bài tập trắc nghiệm** với nhiều loại câu hỏi  
-- Tạo **bài tập tự luận** (text hoặc upload file)  
-- Chấm điểm và phản hồi học sinh  
-- Theo dõi tiến độ học tập  
-- Giao tiếp với học sinh qua thông báo & bình luận  
+
+- Quản lý lớp và môn phụ trách
+- Tạo & quản lý **bài giảng** (file, video)
+- Tạo **bài tập trắc nghiệm** với nhiều loại câu hỏi
+- Tạo **bài tập tự luận** (text hoặc upload file)
+- Chấm điểm và phản hồi học sinh
+- Theo dõi tiến độ học tập
+- Giao tiếp với học sinh qua thông báo & bình luận
 
 ---
 
 ### 👨‍🎓 Học sinh (Student)
-- Truy cập nội dung học tập theo lớp/môn  
-- Xem bài giảng, tài liệu, video  
-- Làm bài tập với giao diện trực quan  
-- Nộp bài và theo dõi kết quả  
-- Nhận phản hồi từ giáo viên  
-- Tương tác qua bình luận  
+
+- Truy cập nội dung học tập theo lớp/môn
+- Xem bài giảng, tài liệu, video
+- Làm bài tập với giao diện trực quan
+- Nộp bài và theo dõi kết quả
+- Nhận phản hồi từ giáo viên
+- Tương tác qua bình luận
 
 ---
 
@@ -93,6 +100,7 @@ EduLMS được xây dựng theo mô hình **Client–Server**, tách biệt fro
 - **Database**: Microsoft SQL Server
 
 ### Kiến trúc chính:
+
 - JWT Authentication + Refresh Token
 - Middleware (Auth, Upload)
 - Modular Controller theo domain
@@ -105,13 +113,14 @@ EduLMS được xây dựng theo mô hình **Client–Server**, tách biệt fro
 
 Hệ thống được thiết kế theo chuẩn quan hệ, bao gồm các thực thể chính:
 
-- Users, Classes, Subjects  
-- Courses (giảng dạy)  
-- Lessons, Assignments  
-- Submissions, StudentAnswers  
-- Notifications, Announcements  
+- Users, Classes, Subjects
+- Courses (giảng dạy)
+- Lessons, Assignments
+- Submissions, StudentAnswers
+- Notifications, Announcements
 
 Hỗ trợ:
+
 - Quan hệ nhiều–nhiều (Student ↔ Class)
 - Quản lý bài tập và bài nộp chi tiết
 - Theo dõi lịch sử và trạng thái học tập
@@ -120,15 +129,15 @@ Hỗ trợ:
 
 ## 🔐 Phân quyền hệ thống (RBAC)
 
-| Chức năng | Admin | Teacher | Student |
-|----------|------|--------|--------|
-| Quản lý người dùng | ✅ | ❌ | ❌ |
-| Quản lý lớp & môn | ✅ | ❌ | ❌ |
-| Tạo bài giảng | ✅ | ✅ | ❌ |
-| Tạo bài tập | ✅ | ✅ | ❌ |
-| Chấm điểm | ✅ | ✅ | ❌ |
-| Làm bài | ❌ | ❌ | ✅ |
-| Xem nội dung | ✅ | ✅ | ✅ |
+| Chức năng          | Admin | Teacher | Student |
+| ------------------ | ----- | ------- | ------- |
+| Quản lý người dùng | ✅    | ❌      | ❌      |
+| Quản lý lớp & môn  | ✅    | ❌      | ❌      |
+| Tạo bài giảng      | ✅    | ✅      | ❌      |
+| Tạo bài tập        | ✅    | ✅      | ❌      |
+| Chấm điểm          | ✅    | ✅      | ❌      |
+| Làm bài            | ❌    | ❌      | ✅      |
+| Xem nội dung       | ✅    | ✅      | ✅      |
 
 ---
 
@@ -143,6 +152,7 @@ Hệ thống cung cấp RESTful API rõ ràng, bao gồm:
 - Submission & Grading
 
 Nguyên tắc thiết kế:
+
 - Resource-based URL
 - Stateless authentication
 - Role-based authorization
@@ -151,27 +161,27 @@ Nguyên tắc thiết kế:
 
 ## 🛠️ Công nghệ sử dụng
 
-| Layer | Technology |
-|------|-----------|
-| Backend | Node.js, Express |
-| Database | Microsoft SQL Server |
-| Auth | JWT (Access + Refresh Token) |
-| Frontend | React 18 |
-| Styling | Tailwind CSS |
-| State | Context API |
-| HTTP | Axios |
-| Upload | Multer |
+| Layer    | Technology                   |
+| -------- | ---------------------------- |
+| Backend  | Node.js, Express             |
+| Database | PostgreSQL                   |
+| Auth     | JWT (Access + Refresh Token) |
+| Frontend | React 18                     |
+| Styling  | Tailwind CSS                 |
+| State    | Context API                  |
+| HTTP     | Axios                        |
+| Upload   | Multer                       |
 
 ---
 
 ## 📈 Định hướng phát triển
 
 - Real-time notification (WebSocket)
-- Dashboard & analytics nâng cao  
-- Export báo cáo (PDF/Excel)  
-- Tích hợp lịch học  
-- Mobile app (React Native)  
-- Video learning / live class  
+- Dashboard & analytics nâng cao
+- Export báo cáo (PDF/Excel)
+- Tích hợp lịch học
+- Mobile app (React Native)
+- Video learning / live class
 
 ---
 

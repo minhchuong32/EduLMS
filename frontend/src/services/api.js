@@ -82,6 +82,7 @@ export const authApi = {
 export const userApi = {
   getAll: (params) => api.get("/users", { params }),
   getById: (id) => api.get(`/users/${id}`),
+  getProfile: () => api.get("/users/profile"),
   create: (data) => api.post("/users", data),
   update: (id, data) => api.put(`/users/${id}`, data),
   delete: (id) => api.delete(`/users/${id}`),
@@ -186,6 +187,7 @@ export const submissionApi = {
 export const announcementApi = {
   getAll: (params) => api.get("/announcements", { params }),
   create: (data) => api.post("/announcements", data),
+  update: (id, data) => api.put(`/announcements/${id}`, data),
   delete: (id) => api.delete(`/announcements/${id}`),
 };
 

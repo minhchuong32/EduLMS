@@ -53,7 +53,7 @@ const getLesson = async (req, res) => {
       SELECT c.*, u.fullName AS authorName, u.avatar AS authorAvatar, u.role AS authorRole
       FROM Comments c
       JOIN Users u ON c.authorId = u.id
-      WHERE c.lessonId = @id AND c.parentId IS NULL
+      WHERE c.lessonId = @id
       ORDER BY c.createdAt ASC
     `,
       { id },

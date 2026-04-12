@@ -2,7 +2,12 @@ import React, { useEffect, useState } from "react";
 import { announcementApi } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
-import { PlusIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import {
+  PlusIcon,
+  PencilIcon,
+  TrashIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 
@@ -10,7 +15,10 @@ export function AnnouncementsPage() {
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [formMode, setFormMode] = useState("create");
+  const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({ title: "", content: "" });
+  const [submitting, setSubmitting] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -20,45 +28,86 @@ export function AnnouncementsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleCreate = async (e) => {
+  const openCreate = () => {
+    setFormMode("create");
+    setEditingId(null);
+    setForm({ title: "", content: "" });
+    setShowForm(true);
+  };
+
+  const openEdit = (announcement) => {
+    setFormMode("edit");
+    setEditingId(announcement.id);
+    setForm({ title: announcement.title, content: announcement.content });
+    setShowForm(true);
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setForm({ title: "", content: "" });
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
     try {
-      const { data } = await announcementApi.create({
-        ...form,
-        isGlobal: user.role === "admin",
-      });
-      setAnnouncements((prev) => [data, ...prev]);
-      setShowForm(false);
-      setForm({ title: "", content: "" });
-      toast.success("Đăng tin thành công!");
-    } catch {
-      toast.error("Có lỗi xảy ra");
+      if (formMode === "create") {
+        const { data } = await announcementApi.create({ ...form });
+        setAnnouncements((prev) => [data, ...prev]);
+        toast.success("Đăng thông báo thành công!");
+      } else {
+        const { data } = await announcementApi.update(editingId, {
+          ...form,
+        });
+        setAnnouncements((prev) =>
+          prev.map((item) => (item.id === editingId ? data : item)),
+        );
+        toast.success("Đã cập nhật thông báo");
+      }
+      closeForm();
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Có lỗi xảy ra");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Xóa tin này?")) return;
-    await announcementApi.delete(id);
-    setAnnouncements((prev) => prev.filter((a) => a.id !== id));
-    toast.success("Đã xóa");
+    try {
+      await announcementApi.delete(id);
+      setAnnouncements((prev) => prev.filter((a) => a.id !== id));
+      toast.success("Đã xóa");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Xóa thất bại");
+    }
   };
 
-  const canPost = user.role === "teacher" || user.role === "admin";
+  const canPost = user.role === "admin";
+
+  if (!user || !["admin", "teacher"].includes(user.role)) {
+    return (
+      <div className="max-w-3xl mx-auto p-6 text-center text-gray-500">
+        Bạn không có quyền truy cập trang này.
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto p-4 md:p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-xl md:text-2xl font-bold text-gray-900">
-          Bảng tin
+          Thông báo hệ thống
         </h1>
         {canPost && (
           <button
-            onClick={() => setShowForm(!showForm)}
+            onClick={openCreate}
             className="flex items-center gap-1.5 bg-blue-600 text-white px-3 md:px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 active:bg-blue-800"
           >
             <PlusIcon className="w-4 h-4" />
-            <span className="hidden sm:inline">Đăng tin</span>
+            <span className="hidden sm:inline">Đăng thông báo</span>
             <span className="sm:hidden">Đăng</span>
           </button>
         )}
@@ -69,15 +118,18 @@ export function AnnouncementsPage() {
         <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
           <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg p-5">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-gray-800">Tin mới</h2>
+              <h2 className="font-bold text-gray-800">
+                {formMode === "create" ? "Tin mới" : "Sửa thông báo"}
+              </h2>
+
               <button
-                onClick={() => setShowForm(false)}
+                onClick={closeForm}
                 className="p-1 rounded-lg hover:bg-gray-100"
               >
                 <XMarkIcon className="w-5 h-5 text-gray-400" />
               </button>
             </div>
-            <form onSubmit={handleCreate} className="space-y-3">
+            <form onSubmit={handleSubmit} className="space-y-3">
               <input
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
@@ -96,13 +148,18 @@ export function AnnouncementsPage() {
               <div className="flex gap-3 pt-1">
                 <button
                   type="submit"
-                  className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700"
+                  disabled={submitting}
+                  className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-60"
                 >
-                  Đăng
+                  {submitting
+                    ? "Đang lưu..."
+                    : formMode === "create"
+                      ? "Đăng"
+                      : "Lưu thay đổi"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowForm(false)}
+                  onClick={closeForm}
                   className="flex-1 py-3 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50"
                 >
                   Hủy
@@ -135,14 +192,26 @@ export function AnnouncementsPage() {
                     <h3 className="font-bold text-gray-800 text-sm md:text-base leading-snug">
                       {ann.title}
                     </h3>
-                    {(ann.authorId === user.id || user.role === "admin") && (
-                      <button
-                        onClick={() => handleDelete(ann.id)}
-                        className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg flex-shrink-0 -mt-0.5"
-                      >
-                        <TrashIcon className="w-4 h-4" />
-                      </button>
-                    )}
+                    <div className="flex items-center gap-1.5 flex-shrink-0 -mt-0.5">
+                      {user.role === "admin" && (
+                        <button
+                          onClick={() => openEdit(ann)}
+                          className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg"
+                          aria-label="Sửa thông báo"
+                        >
+                          <PencilIcon className="w-4 h-4" />
+                        </button>
+                      )}
+                      {user.role === "admin" && (
+                        <button
+                          onClick={() => handleDelete(ann.id)}
+                          className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg"
+                          aria-label="Xóa thông báo"
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <p className="text-gray-500 text-sm mt-1.5 whitespace-pre-wrap leading-relaxed">
                     {ann.content}
@@ -161,7 +230,7 @@ export function AnnouncementsPage() {
                     </span>
                     {ann.isGlobal && (
                       <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full">
-                        Toàn trường
+                        Hệ thống
                       </span>
                     )}
                   </div>

@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { notificationApi } from "../services/api";
-import { BellIcon, CheckIcon } from "@heroicons/react/24/outline";
+import { Link } from "react-router-dom";
+import { BellIcon, CheckIcon, PlusIcon } from "@heroicons/react/24/outline";
 import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
 import { toast } from "react-toastify";
+import { useAuth } from "../context/AuthContext";
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
     notificationApi
@@ -35,16 +38,28 @@ export default function NotificationsPage() {
             <p className="text-sm text-blue-600 mt-0.5">{unread} chưa đọc</p>
           )}
         </div>
-        {unread > 0 && (
-          <button
-            onClick={markAll}
-            className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-xl transition-colors"
-          >
-            <CheckIcon className="w-4 h-4" />
-            <span className="hidden sm:inline">Đánh dấu tất cả đã đọc</span>
-            <span className="sm:hidden">Đọc hết</span>
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {user?.role === "admin" && (
+            <Link
+              to="/announcements"
+              className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-xl transition-colors"
+            >
+              <PlusIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">Tạo thông báo</span>
+              <span className="sm:hidden">Tạo</span>
+            </Link>
+          )}
+          {unread > 0 && (
+            <button
+              onClick={markAll}
+              className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-xl transition-colors"
+            >
+              <CheckIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">Đánh dấu tất cả đã đọc</span>
+              <span className="sm:hidden">Đọc hết</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (

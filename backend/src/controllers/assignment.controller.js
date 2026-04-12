@@ -347,7 +347,34 @@ const deleteAssignment = async (req, res) => {
       return res.status(403).json({ error: "Access denied" });
     }
 
-    await query("DELETE FROM Assignments WHERE id = @id", { id });
+    await withTransaction(async (client) => {
+      await query(
+        `
+        DELETE FROM StudentAnswers
+        WHERE submissionId IN (SELECT id FROM Submissions WHERE assignmentId = @id)
+      `,
+        { id },
+        client,
+      );
+
+      await query(
+        `
+        DELETE FROM Submissions
+        WHERE assignmentId = @id
+      `,
+        { id },
+        client,
+      );
+
+      await query(
+        `
+        DELETE FROM Assignments
+        WHERE id = @id
+      `,
+        { id },
+        client,
+      );
+    });
     res.json({ message: "Assignment deleted" });
   } catch (err) {
     res.status(500).json({ error: "Server error" });

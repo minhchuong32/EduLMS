@@ -79,23 +79,53 @@ export default function CourseDetailPage() {
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState(null);
   const [deletingAssignment, setDeletingAssignment] = useState(null);
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+  const [announcementForm, setAnnouncementForm] = useState({
+    title: "",
+    content: "",
+  });
+  const [submittingAnnouncement, setSubmittingAnnouncement] = useState(false);
 
   const isTeacher = user.role === "teacher" || user.role === "admin";
+  const canManageAnnouncements = user.role !== "student";
 
   useEffect(() => {
-    Promise.all([
-      courseApi.getById(id),
-      lessonApi.getByCourse(id),
-      assignmentApi.getByCourse(id),
-      announcementApi.getAll({ courseId: id }),
-    ])
-      .then(([c, l, a, ann]) => {
-        setCourse(c.data);
-        setLessons(l.data);
-        setAssignments(a.data);
-        setAnnouncements(ann.data);
-      })
-      .finally(() => setLoading(false));
+    const load = async () => {
+      try {
+        const [courseRes, lessonRes, assignmentRes] = await Promise.all([
+          courseApi.getById(id),
+          lessonApi.getByCourse(id),
+          assignmentApi.getByCourse(id),
+        ]);
+
+        const courseData = courseRes.data;
+        setCourse(courseData);
+        setLessons(lessonRes.data);
+        setAssignments(assignmentRes.data);
+
+        const announcementRequests = [announcementApi.getAll({ courseId: id })];
+
+        if (courseData.classId) {
+          announcementRequests.push(
+            announcementApi.getAll({ classId: courseData.classId }),
+          );
+        }
+
+        const announcementResponses = await Promise.all(announcementRequests);
+        const mergedAnnouncements = announcementResponses
+          .flatMap((response) => response.data)
+          .filter(
+            (announcement, index, self) =>
+              index === self.findIndex((item) => item.id === announcement.id),
+          );
+
+        setAnnouncements(mergedAnnouncements);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
   }, [id]);
 
   const handlePublishLesson = async (lessonId, publish) => {
@@ -135,6 +165,39 @@ export default function CourseDetailPage() {
       toast.error(err.response?.data?.error || "Xóa thất bại");
     } finally {
       setDeletingAssignment(null);
+    }
+  };
+
+  const handleCreateAnnouncement = async (e) => {
+    e.preventDefault();
+    setSubmittingAnnouncement(true);
+    try {
+      const { data } = await announcementApi.create({
+        courseEnrollmentId: id,
+        title: announcementForm.title,
+        content: announcementForm.content,
+      });
+      setAnnouncements((prev) => [data, ...prev]);
+      setAnnouncementForm({ title: "", content: "" });
+      setShowAnnouncementModal(false);
+      toast.success("Đã thêm thông báo");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Thêm thông báo thất bại");
+    } finally {
+      setSubmittingAnnouncement(false);
+    }
+  };
+
+  const handleDeleteAnnouncement = async (announcement) => {
+    if (!window.confirm("Xóa thông báo này?")) return;
+    try {
+      await announcementApi.delete(announcement.id);
+      setAnnouncements((prev) =>
+        prev.filter((item) => item.id !== announcement.id),
+      );
+      toast.success("Đã xóa thông báo");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Xóa thông báo thất bại");
     }
   };
 
@@ -438,6 +501,15 @@ export default function CourseDetailPage() {
           {/* Tab Thông báo */}
           {activeTab === 2 && (
             <div>
+              {canManageAnnouncements && (
+                <button
+                  onClick={() => setShowAnnouncementModal(true)}
+                  className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 mb-4 active:bg-blue-800"
+                >
+                  <PlusIcon className="w-4 h-4" /> Thêm thông báo
+                </button>
+              )}
+
               {announcements.length === 0 ? (
                 <p className="text-center text-gray-400 py-10">
                   Chưa có thông báo nào
@@ -449,9 +521,19 @@ export default function CourseDetailPage() {
                       key={ann.id}
                       className="p-4 bg-gray-50 rounded-xl border border-gray-100"
                     >
-                      <h3 className="font-semibold text-gray-800 text-sm">
-                        {ann.title}
-                      </h3>
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-semibold text-gray-800 text-sm">
+                          {ann.title}
+                        </h3>
+                        {canManageAnnouncements && (
+                          <button
+                            onClick={() => handleDeleteAnnouncement(ann)}
+                            className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg flex-shrink-0 -mt-1"
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                       <p className="text-gray-500 text-sm mt-1 whitespace-pre-wrap">
                         {ann.content}
                       </p>
@@ -467,6 +549,65 @@ export default function CourseDetailPage() {
           )}
         </div>
       </div>
+
+      {showAnnouncementModal && canManageAnnouncements && (
+        <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] p-0 sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-gray-800">Thêm thông báo</h3>
+              <button
+                onClick={() => setShowAnnouncementModal(false)}
+                className="p-1 rounded-lg hover:bg-gray-100"
+              >
+                <XMarkIcon className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateAnnouncement} className="space-y-3">
+              <input
+                value={announcementForm.title}
+                onChange={(e) =>
+                  setAnnouncementForm((prev) => ({
+                    ...prev,
+                    title: e.target.value,
+                  }))
+                }
+                required
+                placeholder="Tiêu đề thông báo"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <textarea
+                value={announcementForm.content}
+                onChange={(e) =>
+                  setAnnouncementForm((prev) => ({
+                    ...prev,
+                    content: e.target.value,
+                  }))
+                }
+                required
+                rows={5}
+                placeholder="Nội dung thông báo..."
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="submit"
+                  disabled={submittingAnnouncement}
+                  className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {submittingAnnouncement ? "Đang đăng..." : "Đăng thông báo"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAnnouncementModal(false)}
+                  className="flex-1 py-3 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  Hủy
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modals */}
       {showLessonModal && (

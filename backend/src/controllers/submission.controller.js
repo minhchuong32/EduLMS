@@ -27,11 +27,9 @@ const startSubmission = async (req, res) => {
     const attempts = attemptResult.recordset[0].cnt;
 
     if (attempts >= assignment.maxAttempts) {
-      return res
-        .status(400)
-        .json({
-          error: `Maximum attempts (${assignment.maxAttempts}) reached`,
-        });
+      return res.status(400).json({
+        error: `Maximum attempts (${assignment.maxAttempts}) reached`,
+      });
     }
 
     // Check if in_progress submission exists
@@ -109,12 +107,18 @@ const submitQuiz = async (req, res) => {
       let maxScore = 0;
 
       for (const question of questions) {
-        maxScore += question.points;
-        const answer = answers.find((a) => a.questionId === question.id);
-        const selectedIds = answer ? answer.selectedOptionIds : [];
+        const questionPoints = Number(question.points) || 0;
+        maxScore += questionPoints;
+
+        const answer = answers.find(
+          (a) => String(a.questionId) === String(question.id),
+        );
+        const selectedIds = Array.isArray(answer?.selectedOptionIds)
+          ? answer.selectedOptionIds.map((id) => String(id))
+          : [];
         const correctOptionIds = question.options
           .filter((o) => o.isCorrect)
-          .map((o) => o.id);
+          .map((o) => String(o.id));
 
         let isCorrect = false;
         let pointsEarned = 0;
@@ -126,14 +130,14 @@ const submitQuiz = async (req, res) => {
           isCorrect =
             selectedIds.length === 1 &&
             correctOptionIds.includes(selectedIds[0]);
-          pointsEarned = isCorrect ? question.points : 0;
+          pointsEarned = isCorrect ? questionPoints : 0;
         } else if (question.questionType === "multiple_choice") {
           const correctSet = new Set(correctOptionIds);
           const selectedSet = new Set(selectedIds);
           const allCorrect = [...correctSet].every((id) => selectedSet.has(id));
           const noWrong = [...selectedSet].every((id) => correctSet.has(id));
           isCorrect = allCorrect && noWrong && selectedIds.length > 0;
-          pointsEarned = isCorrect ? question.points : 0;
+          pointsEarned = isCorrect ? questionPoints : 0;
         }
 
         totalScore += pointsEarned;
@@ -155,7 +159,9 @@ const submitQuiz = async (req, res) => {
       }
 
       const finalScore =
-        maxScore > 0 ? (totalScore / maxScore) * submission.totalPoints : 0;
+        maxScore > 0
+          ? (totalScore / maxScore) * (Number(submission.totalPoints) || 0)
+          : 0;
       const roundedScore = Math.round(finalScore * 100) / 100;
 
       await query(

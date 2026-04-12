@@ -16,7 +16,6 @@ import ClassesPage from "./pages/ClassesPage";
 import ClassDetailPage from "./pages/ClassDetailPage";
 import UsersPage from "./pages/UsersPage";
 import ProfilePage from "./pages/ProfilePage";
-import NotificationsPage from "./pages/NotificationsPage";
 import AnnouncementsPage from "./pages/AnnouncementsPage";
 import GradingPage from "./pages/GradingPage";
 import Layout from "./components/common/Layout";
@@ -97,12 +96,11 @@ function AppRoutes() {
             </PrivateRoute>
           }
         />
-        <Route path="announcements" element={<AnnouncementsPage />} />
         <Route
-          path="notifications"
+          path="announcements"
           element={
             <PrivateRoute roles={["admin", "teacher"]}>
-              <NotificationsPage />
+              <AnnouncementsPage />
             </PrivateRoute>
           }
         />

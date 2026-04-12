@@ -4,7 +4,7 @@ Phương án khuyến nghị cho đồ án/tốt nghiệp:
 
 - Frontend: Vercel
 - Backend: VPS chạy Docker
-- Database: SQL Server chạy trong Docker trên cùng VPS, hoặc dịch vụ SQL Server riêng nếu cần scale sau này
+- Database: PostgreSQL chạy trong Docker trên cùng VPS, hoặc dịch vụ PostgreSQL riêng nếu cần scale sau này
 - File upload: volume Docker trên VPS, không lưu trên Vercel
 
 ## 1) Chuẩn bị trước khi deploy
@@ -23,22 +23,22 @@ Phương án khuyến nghị cho đồ án/tốt nghiệp:
 - [ ] Tạo thư mục deploy, ví dụ `/opt/lms-project`.
 - [ ] Clone source code từ GitHub vào VPS.
 - [ ] Tạo file môi trường production cho backend theo mẫu `backend/.env.example`.
-- [ ] Đặt mật khẩu SQL Server đủ mạnh.
+- [ ] Đặt mật khẩu PostgreSQL đủ mạnh.
 - [ ] Đặt `NODE_ENV=production`.
 - [ ] Đặt `FRONTEND_URLS` là domain Vercel sau khi frontend deploy xong.
 
-### Chạy backend + SQL Server
+### Chạy backend + PostgreSQL
 
 Sử dụng `docker-compose.yml` ở root project để chạy:
 
-- [ ] SQL Server container.
+- [ ] PostgreSQL container.
 - [ ] Backend container.
 - [ ] Volume cho thư mục upload.
 
 Lưu ý:
 
-- `DB_SERVER` trong backend nên là `sqlserver` nếu backend và SQL Server chạy chung trong `docker-compose`.
-- Không nên expose SQL Server ra Internet nếu không bắt buộc.
+- `DATABASE_URL` trong backend nên trỏ tới PostgreSQL container nếu backend và database chạy chung trong `docker-compose`.
+- Không nên expose PostgreSQL ra Internet nếu không bắt buộc.
 - Nên chỉ mở port `5000` cho backend và dùng reverse proxy nếu cần HTTPS riêng trên VPS.
 
 ### Kiểm tra backend
@@ -101,13 +101,9 @@ Ví dụ:
 
 - `PORT=5000`
 - `NODE_ENV=production`
-- `DB_SERVER=sqlserver`
-- `DB_PORT=1433`
-- `DB_NAME=LMS_DB`
-- `DB_USER=sa`
-- `DB_PASSWORD=your_strong_password`
-- `DB_ENCRYPT=false`
-- `DB_TRUST_CERT=true`
+- `DATABASE_URL=postgresql://user:password@db-host:5432/lms_db`
+- `PG_SSL=false`
+- `PG_POOL_MAX=10`
 - `JWT_SECRET=your_secret`
 - `JWT_REFRESH_SECRET=your_refresh_secret`
 - `FRONTEND_URLS=https://your-frontend.vercel.app`
@@ -117,4 +113,4 @@ Ví dụ:
 - [ ] Thêm reverse proxy Nginx trên VPS.
 - [ ] Bật HTTPS bằng Let’s Encrypt.
 - [ ] Chuyển upload file sang object storage nếu dung lượng lớn.
-- [ ] Sao lưu database SQL Server định kỳ.
+- [ ] Sao lưu database PostgreSQL định kỳ.
