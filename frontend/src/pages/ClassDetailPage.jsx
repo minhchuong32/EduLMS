@@ -4,6 +4,7 @@ import { classApi, userApi, announcementApi } from "../services/api";
 import { toast } from "react-toastify";
 import {
   UserPlusIcon,
+  PlusIcon,
   TrashIcon,
   MagnifyingGlassIcon,
   XMarkIcon,
@@ -48,7 +49,7 @@ export default function ClassDetailPage() {
       })
       .finally(() => setLoading(false));
 
-    if (user.role === "admin") {
+    if (user.role !== "student") {
       userApi
         .getAll({ role: "student", limit: 200 })
         .then((r) => setAllStudents(r.data.data || []));
@@ -145,8 +146,8 @@ export default function ClassDetailPage() {
               sinh
             </p>
           </div>
-          {/* Nút thêm học sinh — chỉ admin */}
-          {user.role === "admin" && (
+          {/* Nút thêm học sinh — admin và giáo viên */}
+          {user.role !== "student" && (
             <button
               onClick={() => setShowAddSheet(true)}
               className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 flex-shrink-0"
@@ -267,7 +268,7 @@ export default function ClassDetailPage() {
       </div>
 
       {/* Bottom sheet thêm học sinh */}
-      {showAddSheet && user.role === "admin" && (
+      {showAddSheet && user.role !== "student" && (
         <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
           <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md p-5">
             <div className="flex items-center justify-between mb-4">

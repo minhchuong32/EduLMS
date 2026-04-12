@@ -34,10 +34,16 @@ const migrate = async () => {
         gradeLevel varchar(20) NOT NULL,
         academicYear varchar(20) NOT NULL,
         description varchar(500),
+        homeroomTeacherId uuid REFERENCES users(id),
         isActive boolean NOT NULL DEFAULT true,
         createdAt timestamptz NOT NULL DEFAULT now(),
         updatedAt timestamptz NOT NULL DEFAULT now()
       );
+    `);
+
+    await query(`
+      ALTER TABLE classes
+      ADD COLUMN IF NOT EXISTS homeroomteacherid uuid REFERENCES users(id);
     `);
 
     await query(`

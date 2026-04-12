@@ -13,7 +13,7 @@ const { authenticate, authorize } = require("../middleware/auth.middleware");
 const { upload, setUploadType } = require("../middleware/upload.middleware");
 
 router.use(authenticate);
-router.get("/", authorize("admin"), getUsers);
+router.get("/", authorize("admin", "teacher"), getUsers);
 router.post("/", authorize("admin"), createUser);
 router.get("/profile", getProfile);
 router.put(

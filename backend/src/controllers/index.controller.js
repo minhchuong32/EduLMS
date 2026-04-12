@@ -4,7 +4,18 @@ const bcrypt = require("bcryptjs");
 // ==================== USER CONTROLLER ====================
 const getUsers = async (req, res) => {
   try {
-    const { role, search } = req.query;
+    const requestedRole = req.query.role;
+    const { search } = req.query;
+    const role = req.user.role === "teacher" ? "student" : requestedRole;
+
+    if (
+      req.user.role === "teacher" &&
+      requestedRole &&
+      requestedRole !== "student"
+    ) {
+      return res.status(403).json({ error: "Insufficient permissions" });
+    }
+
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(
       100,
@@ -232,13 +243,43 @@ const updateProfile = async (req, res) => {
 };
 
 const teacherHasClassAccess = async (classId, teacherId) => {
-  const result = await query(
+  const homeroomColumnExists = await query(
     `
     SELECT 1
-    FROM CourseEnrollments
-    WHERE classId = @classId AND teacherId = @teacherId AND isActive = true
+    FROM information_schema.columns
+    WHERE table_name = 'classes' AND column_name = 'homeroomteacherid'
     LIMIT 1
   `,
+  );
+  const supportsHomeroomTeacher = homeroomColumnExists.recordset.length > 0;
+
+  const result = await query(
+    supportsHomeroomTeacher
+      ? `
+        SELECT 1
+        FROM Classes c
+        WHERE c.id = @classId
+          AND (
+            c.homeroomTeacherId = @teacherId
+            OR EXISTS (
+              SELECT 1
+              FROM CourseEnrollments ce
+              WHERE ce.classId = c.id AND ce.teacherId = @teacherId AND ce.isActive = true
+            )
+          )
+        LIMIT 1
+      `
+      : `
+        SELECT 1
+        FROM Classes c
+        WHERE c.id = @classId
+          AND EXISTS (
+            SELECT 1
+            FROM CourseEnrollments ce
+            WHERE ce.classId = c.id AND ce.teacherId = @teacherId AND ce.isActive = true
+          )
+        LIMIT 1
+      `,
     { classId, teacherId },
   );
 
@@ -256,9 +297,20 @@ const getClasses = async (req, res) => {
       params.academicYear = academicYear;
     }
 
+    const homeroomColumnExists = await query(
+      `
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'classes' AND column_name = 'homeroomteacherid'
+      LIMIT 1
+    `,
+    );
+    const supportsHomeroomTeacher = homeroomColumnExists.recordset.length > 0;
+
     if (req.user.role === "teacher") {
-      where +=
-        " AND EXISTS (SELECT 1 FROM CourseEnrollments ce WHERE ce.classId = c.id AND ce.teacherId = @teacherId AND ce.isActive = true)";
+      where += supportsHomeroomTeacher
+        ? " AND (c.homeroomTeacherId = @teacherId OR EXISTS (SELECT 1 FROM CourseEnrollments ce WHERE ce.classId = c.id AND ce.teacherId = @teacherId AND ce.isActive = true))"
+        : " AND EXISTS (SELECT 1 FROM CourseEnrollments ce WHERE ce.classId = c.id AND ce.teacherId = @teacherId AND ce.isActive = true)";
       params.teacherId = req.user.id;
     }
 
@@ -280,6 +332,16 @@ const getClasses = async (req, res) => {
 const getClassById = async (req, res) => {
   try {
     const { id } = req.params;
+    const homeroomColumnExists = await query(
+      `
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'classes' AND column_name = 'homeroomteacherid'
+      LIMIT 1
+    `,
+    );
+    const supportsHomeroomTeacher = homeroomColumnExists.recordset.length > 0;
+
     const classResult = await query(
       `
       SELECT c.*, (SELECT COUNT(*) FROM StudentClasses WHERE classId = c.id) AS studentCount
@@ -329,20 +391,66 @@ const getClassById = async (req, res) => {
 
 const createClass = async (req, res) => {
   try {
-    const { name, gradeLevel, academicYear, description } = req.body;
+    const { name, gradeLevel, academicYear, description, teacherId } = req.body;
+
+    const homeroomColumnExists = await query(
+      `
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'classes' AND column_name = 'homeroomteacherid'
+      LIMIT 1
+    `,
+    );
+    const supportsHomeroomTeacher = homeroomColumnExists.recordset.length > 0;
+
+    if (!supportsHomeroomTeacher) {
+      await query(
+        `
+        ALTER TABLE classes
+        ADD COLUMN IF NOT EXISTS homeroomteacherid uuid REFERENCES users(id);
+      `,
+      );
+    }
+
+    const teacherCheck = teacherId
+      ? await query(
+          "SELECT id FROM Users WHERE id = @id AND role = 'teacher' AND isActive = true",
+          { id: teacherId },
+        )
+      : { recordset: [] };
+
+    if (!teacherCheck.recordset.length) {
+      return res
+        .status(400)
+        .json({ error: "Vui lòng chọn giáo viên đảm nhiệm hợp lệ" });
+    }
 
     const result = await query(
-      `
-      INSERT INTO Classes (name, gradeLevel, academicYear, description)
-      VALUES (@name, @gradeLevel, @academicYear, @description)
-      RETURNING *
-    `,
-      {
-        name,
-        gradeLevel,
-        academicYear,
-        description: description || null,
-      },
+      supportsHomeroomTeacher
+        ? `
+          INSERT INTO Classes (name, gradeLevel, academicYear, description, homeroomTeacherId)
+          VALUES (@name, @gradeLevel, @academicYear, @description, @teacherId)
+          RETURNING *
+        `
+        : `
+          INSERT INTO Classes (name, gradeLevel, academicYear, description)
+          VALUES (@name, @gradeLevel, @academicYear, @description)
+          RETURNING *
+        `,
+      supportsHomeroomTeacher
+        ? {
+            name,
+            gradeLevel,
+            academicYear,
+            description: description || null,
+            teacherId,
+          }
+        : {
+            name,
+            gradeLevel,
+            academicYear,
+            description: description || null,
+          },
     );
     res.status(201).json(result.recordset[0]);
   } catch (err) {

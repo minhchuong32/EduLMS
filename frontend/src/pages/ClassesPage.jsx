@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { classApi } from "../services/api";
+import { classApi, userApi } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import {
   PlusIcon,
@@ -13,11 +13,14 @@ export function ClassesPage() {
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [teachers, setTeachers] = useState([]);
+  const [optionsLoading, setOptionsLoading] = useState(false);
   const [form, setForm] = useState({
     name: "",
     gradeLevel: "10",
     academicYear: "2024-2025",
     description: "",
+    teacherId: "",
   });
   const { user } = useAuth();
 
@@ -28,12 +31,28 @@ export function ClassesPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (user?.role !== "admin") return;
+
+    setOptionsLoading(true);
+    userApi
+      .getAll({ role: "teacher", limit: 100 })
+      .then((r) => setTeachers(r.data.data || []))
+      .catch((err) => {
+        toast.error(
+          err.response?.data?.error || "Không tải được danh sách giáo viên",
+        );
+      })
+      .finally(() => setOptionsLoading(false));
+  }, [user?.role]);
+
   const openCreate = () => {
     setForm({
       name: "",
       gradeLevel: "10",
       academicYear: "2024-2025",
       description: "",
+      teacherId: teachers[0]?.id || "",
     });
     setShowForm(true);
   };
@@ -64,7 +83,7 @@ export function ClassesPage() {
         <h1 className="text-xl md:text-2xl font-bold text-gray-900">Lớp học</h1>
         {user.role === "admin" && (
           <button
-            onClick={() => setShowForm(true)}
+            onClick={openCreate}
             className="flex items-center gap-1.5 bg-blue-600 text-white px-3 md:px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700"
           >
             <PlusIcon className="w-4 h-4" />
@@ -88,6 +107,32 @@ export function ClassesPage() {
               </button>
             </div>
             <form onSubmit={handleCreate} className="space-y-3">
+              {optionsLoading ? (
+                <div className="py-4 text-center text-sm text-gray-400">
+                  Đang tải giáo viên...
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Giáo viên đảm nhiệm *
+                  </label>
+                  <select
+                    value={form.teacherId}
+                    onChange={(e) =>
+                      setForm({ ...form, teacherId: e.target.value })
+                    }
+                    required
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">-- Chọn giáo viên --</option>
+                    {teachers.map((teacher) => (
+                      <option key={teacher.id} value={teacher.id}>
+                        {teacher.fullName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Tên lớp *
@@ -137,6 +182,7 @@ export function ClassesPage() {
               <div className="flex gap-3 pt-1">
                 <button
                   type="submit"
+                  disabled={optionsLoading || !form.teacherId}
                   className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700"
                 >
                   Tạo lớp
