@@ -79,6 +79,7 @@ const migrate = async () => {
         academicYear varchar(20),
         isActive boolean NOT NULL DEFAULT true,
         createdAt timestamptz NOT NULL DEFAULT now(),
+        updatedAt timestamptz NOT NULL DEFAULT now(),
         UNIQUE (teacherId, subjectId, classId, academicYear)
       );
     `);

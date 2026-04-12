@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { classApi, userApi, announcementApi } from "../services/api";
 import { toast } from "react-toastify";
 import {
   UserPlusIcon,
   PlusIcon,
   TrashIcon,
+  PencilSquareIcon,
   MagnifyingGlassIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
@@ -13,22 +14,36 @@ import { useAuth } from "../context/AuthContext";
 
 export default function ClassDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [cls, setCls] = useState(null);
   const [students, setStudents] = useState([]);
   const [allStudents, setAllStudents] = useState([]);
+  const [teachers, setTeachers] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedStudent, setSelectedStudent] = useState("");
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [search, setSearch] = useState("");
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    gradeLevel: "10",
+    academicYear: "2024-2025",
+    description: "",
+    teacherId: "",
+  });
+  const [editingClass, setEditingClass] = useState(false);
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
   const [announcementForm, setAnnouncementForm] = useState({
     title: "",
     content: "",
   });
   const [submittingAnnouncement, setSubmittingAnnouncement] = useState(false);
+
+  const role = user?.role;
+  const isAdmin = role === "admin";
 
   useEffect(() => {
     setLoading(true);
@@ -49,12 +64,73 @@ export default function ClassDetailPage() {
       })
       .finally(() => setLoading(false));
 
-    if (user.role !== "student") {
+    if (role !== "student") {
       userApi
         .getAll({ role: "student", limit: 200 })
         .then((r) => setAllStudents(r.data.data || []));
     }
-  }, [id, user.role]);
+
+    if (role === "admin") {
+      userApi
+        .getAll({ role: "teacher", limit: 100 })
+        .then((r) => setTeachers(r.data.data || []))
+        .catch(() => {
+          toast.error("Không tải được danh sách giáo viên");
+        });
+    }
+  }, [id, role]);
+
+  useEffect(() => {
+    if (!cls) return;
+
+    setEditForm({
+      name: cls.name || "",
+      gradeLevel: cls.gradeLevel || "10",
+      academicYear: cls.academicYear || "2024-2025",
+      description: cls.description || "",
+      teacherId:
+        cls.homeroomTeacherId || cls.homeroomteacherid || teachers[0]?.id || "",
+    });
+  }, [cls, teachers]);
+
+  const handleUpdateClass = async (e) => {
+    e.preventDefault();
+
+    if (!editForm.teacherId) {
+      toast.error("Vui lòng chọn giáo viên đảm nhiệm");
+      return;
+    }
+
+    setEditingClass(true);
+    try {
+      await classApi.update(id, editForm);
+      const { data } = await classApi.getById(id);
+      setCls(data);
+      setStudents(data.students || []);
+      setShowEditModal(false);
+      toast.success("Đã cập nhật lớp học");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Cập nhật lớp học thất bại");
+    } finally {
+      setEditingClass(false);
+    }
+  };
+
+  const handleDeleteClass = async () => {
+    if (
+      !window.confirm("Xóa lớp học này? Toàn bộ khóa học của lớp sẽ bị ẩn.")
+    ) {
+      return;
+    }
+
+    try {
+      await classApi.delete(id);
+      toast.success("Đã xóa lớp học");
+      navigate("/classes");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Xóa lớp học thất bại");
+    }
+  };
 
   const handleAdd = async () => {
     if (!selectedStudent) return;
@@ -147,7 +223,7 @@ export default function ClassDetailPage() {
             </p>
           </div>
           {/* Nút thêm học sinh — admin và giáo viên */}
-          {user.role !== "student" && (
+          {role !== "student" && (
             <button
               onClick={() => setShowAddSheet(true)}
               className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 flex-shrink-0"
@@ -159,10 +235,39 @@ export default function ClassDetailPage() {
         </div>
       </div>
 
+      {isAdmin && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6 mb-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="font-bold text-gray-800">Quản trị lớp học</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Sửa thông tin lớp hoặc xóa lớp nếu cần dọn dữ liệu.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => setShowEditModal(true)}
+                className="flex items-center gap-1.5 border border-gray-200 text-gray-700 px-3 py-2 rounded-xl text-sm font-medium hover:bg-gray-50"
+              >
+                <PencilSquareIcon className="w-4 h-4" />
+                Sửa lớp
+              </button>
+              <button
+                onClick={handleDeleteClass}
+                className="flex items-center gap-1.5 border border-red-200 text-red-600 px-3 py-2 rounded-xl text-sm font-medium hover:bg-red-50"
+              >
+                <TrashIcon className="w-4 h-4" />
+                Xóa lớp
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6 mb-4">
         <div className="flex items-center justify-between gap-3 mb-4">
           <h2 className="font-bold text-gray-800">Thông báo lớp học</h2>
-          {user.role !== "student" && (
+          {role !== "student" && (
             <button
               onClick={() => setShowAnnouncementModal(true)}
               className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 flex-shrink-0"
@@ -188,7 +293,7 @@ export default function ClassDetailPage() {
                   <h3 className="font-semibold text-gray-800 text-sm">
                     {ann.title}
                   </h3>
-                  {user.role !== "student" && (
+                  {role !== "student" && (
                     <button
                       onClick={() => handleDeleteAnnouncement(ann)}
                       className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg flex-shrink-0 -mt-1"
@@ -253,7 +358,7 @@ export default function ClassDetailPage() {
                   </p>
                   <p className="text-xs text-gray-400 truncate">{s.email}</p>
                 </div>
-                {user.role === "admin" && (
+                {role === "admin" && (
                   <button
                     onClick={() => handleRemove(s.id)}
                     className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg flex-shrink-0"
@@ -268,7 +373,7 @@ export default function ClassDetailPage() {
       </div>
 
       {/* Bottom sheet thêm học sinh */}
-      {showAddSheet && user.role !== "student" && (
+      {showAddSheet && role !== "student" && (
         <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
           <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md p-5">
             <div className="flex items-center justify-between mb-4">
@@ -320,7 +425,7 @@ export default function ClassDetailPage() {
         </div>
       )}
 
-      {showAnnouncementModal && user.role !== "student" && (
+      {showAnnouncementModal && role !== "student" && (
         <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
           <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg p-5">
             <div className="flex items-center justify-between mb-4">
@@ -371,6 +476,134 @@ export default function ClassDetailPage() {
                 <button
                   type="button"
                   onClick={() => setShowAnnouncementModal(false)}
+                  className="flex-1 py-3 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  Hủy
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showEditModal && isAdmin && (
+        <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-gray-800">Sửa lớp học</h3>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="p-1 rounded-lg hover:bg-gray-100"
+              >
+                <XMarkIcon className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+            <form onSubmit={handleUpdateClass} className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Giáo viên đảm nhiệm *
+                </label>
+                <select
+                  value={editForm.teacherId}
+                  onChange={(e) =>
+                    setEditForm((prev) => ({
+                      ...prev,
+                      teacherId: e.target.value,
+                    }))
+                  }
+                  required
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- Chọn giáo viên --</option>
+                  {teachers.map((teacher) => (
+                    <option key={teacher.id} value={teacher.id}>
+                      {teacher.fullName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Tên lớp *
+                </label>
+                <input
+                  value={editForm.name}
+                  onChange={(e) =>
+                    setEditForm((prev) => ({
+                      ...prev,
+                      name: e.target.value,
+                    }))
+                  }
+                  required
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Khối lớp
+                  </label>
+                  <select
+                    value={editForm.gradeLevel}
+                    onChange={(e) =>
+                      setEditForm((prev) => ({
+                        ...prev,
+                        gradeLevel: e.target.value,
+                      }))
+                    }
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {["10", "11", "12"].map((g) => (
+                      <option key={g} value={g}>
+                        Lớp {g}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Năm học
+                  </label>
+                  <input
+                    value={editForm.academicYear}
+                    onChange={(e) =>
+                      setEditForm((prev) => ({
+                        ...prev,
+                        academicYear: e.target.value,
+                      }))
+                    }
+                    required
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Mô tả
+                </label>
+                <textarea
+                  value={editForm.description}
+                  onChange={(e) =>
+                    setEditForm((prev) => ({
+                      ...prev,
+                      description: e.target.value,
+                    }))
+                  }
+                  rows={4}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="submit"
+                  disabled={editingClass}
+                  className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {editingClass ? "Đang lưu..." : "Lưu thay đổi"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
                   className="flex-1 py-3 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50"
                 >
                   Hủy

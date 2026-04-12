@@ -1,4 +1,4 @@
-const { query } = require("../config/database");
+const { query, withTransaction } = require("../config/database");
 const bcrypt = require("bcryptjs");
 
 // ==================== USER CONTROLLER ====================
@@ -259,6 +259,7 @@ const teacherHasClassAccess = async (classId, teacherId) => {
         SELECT 1
         FROM Classes c
         WHERE c.id = @classId
+          AND c.isActive = true
           AND (
             c.homeroomTeacherId = @teacherId
             OR EXISTS (
@@ -273,6 +274,7 @@ const teacherHasClassAccess = async (classId, teacherId) => {
         SELECT 1
         FROM Classes c
         WHERE c.id = @classId
+          AND c.isActive = true
           AND EXISTS (
             SELECT 1
             FROM CourseEnrollments ce
@@ -319,7 +321,7 @@ const getClasses = async (req, res) => {
       SELECT c.*, 
         (SELECT COUNT(*) FROM StudentClasses WHERE classId = c.id) AS studentCount
       FROM Classes c
-      ${where} ORDER BY c.gradeLevel, c.name
+      ${where} AND c.isActive = true ORDER BY c.gradeLevel, c.name
     `,
       params,
     );
@@ -345,7 +347,7 @@ const getClassById = async (req, res) => {
     const classResult = await query(
       `
       SELECT c.*, (SELECT COUNT(*) FROM StudentClasses WHERE classId = c.id) AS studentCount
-      FROM Classes c WHERE c.id = @id
+      FROM Classes c WHERE c.id = @id AND c.isActive = true
     `,
       { id },
     );
@@ -466,11 +468,27 @@ const createClass = async (req, res) => {
 const updateClass = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, gradeLevel, academicYear, description, isActive } = req.body;
+    const { name, gradeLevel, academicYear, description, isActive, teacherId } =
+      req.body;
+
+    if (teacherId !== undefined) {
+      const teacherCheck = await query(
+        "SELECT id FROM Users WHERE id = @id AND role = 'teacher' AND isActive = true",
+        { id: teacherId },
+      );
+
+      if (!teacherCheck.recordset.length) {
+        return res
+          .status(400)
+          .json({ error: "Vui lòng chọn giáo viên đảm nhiệm hợp lệ" });
+      }
+    }
+
     await query(
       `
       UPDATE Classes SET name = COALESCE(@name, name), gradeLevel = COALESCE(@gradeLevel, gradeLevel),
         academicYear = COALESCE(@academicYear, academicYear), description = COALESCE(@description, description),
+        homeroomTeacherId = COALESCE(@teacherId, homeroomTeacherId),
         isActive = COALESCE(@isActive, isActive), updatedAt = NOW() WHERE id = @id
     `,
       {
@@ -479,6 +497,7 @@ const updateClass = async (req, res) => {
         gradeLevel,
         academicYear,
         description,
+        teacherId: teacherId !== undefined ? teacherId : null,
         isActive: isActive !== undefined ? !!isActive : null,
       },
     );
@@ -537,6 +556,55 @@ const removeStudentFromClass = async (req, res) => {
     res.json({ message: "Student removed from class" });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
+  }
+};
+
+const deleteClass = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await withTransaction(async (client) => {
+      const deletedClass = await query(
+        `
+        UPDATE Classes
+        SET isActive = false,
+            updatedAt = NOW()
+        WHERE id = @id AND isActive = true
+        RETURNING id
+      `,
+        { id },
+        client,
+      );
+
+      if (!deletedClass.recordset.length) {
+        return null;
+      }
+
+      await query(
+        `
+        UPDATE CourseEnrollments
+        SET isActive = false,
+            updatedAt = NOW()
+        WHERE classId = @id AND isActive = true
+      `,
+        { id },
+        client,
+      );
+
+      return deletedClass.recordset[0];
+    });
+
+    if (!result) {
+      return res.status(404).json({ error: "Class not found" });
+    }
+
+    res.json({ message: "Class deleted" });
+  } catch (err) {
+    console.error("deleteClass error:", err);
+    res.status(500).json({
+      error:
+        process.env.NODE_ENV === "development" ? err.message : "Server error",
+    });
   }
 };
 
@@ -1195,6 +1263,7 @@ module.exports = {
   getClassById,
   createClass,
   updateClass,
+  deleteClass,
   addStudentToClass,
   removeStudentFromClass,
   // Subjects
