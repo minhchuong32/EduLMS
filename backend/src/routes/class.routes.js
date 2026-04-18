@@ -20,7 +20,7 @@ router.delete("/:id", authorize("admin"), deleteClass);
 router.post("/:id/students", authorize("admin", "teacher"), addStudentToClass);
 router.delete(
   "/:id/students/:studentId",
-  authorize("admin"),
+  authorize("admin", "teacher"),
   removeStudentFromClass,
 );
 

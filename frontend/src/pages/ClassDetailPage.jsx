@@ -148,9 +148,13 @@ export default function ClassDetailPage() {
 
   const handleRemove = async (studentId) => {
     if (!window.confirm("Xóa học sinh khỏi lớp?")) return;
-    await classApi.removeStudent(id, studentId);
-    setStudents((prev) => prev.filter((s) => s.id !== studentId));
-    toast.success("Đã xóa");
+    try {
+      await classApi.removeStudent(id, studentId);
+      setStudents((prev) => prev.filter((s) => s.id !== studentId));
+      toast.success("Đã xóa");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Không thể xóa học sinh");
+    }
   };
 
   const handleCreateAnnouncement = async (e) => {
@@ -358,7 +362,7 @@ export default function ClassDetailPage() {
                   </p>
                   <p className="text-xs text-gray-400 truncate">{s.email}</p>
                 </div>
-                {role === "admin" && (
+                {role !== "student" && (
                   <button
                     onClick={() => handleRemove(s.id)}
                     className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg flex-shrink-0"

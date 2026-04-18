@@ -312,15 +312,18 @@ const getSubmissionsByAssignment = async (req, res) => {
 const getSubmissionDetail = async (req, res) => {
   try {
     const { id } = req.params;
+    const { id: currentUserId, role } = req.user;
 
     const result = await query(
       `
       SELECT s.*, u.fullName AS studentName,
              a.title AS assignmentTitle, a.type AS assignmentType,
-             a.totalPoints
+             a.totalPoints,
+             ce.teacherId
       FROM Submissions s
       JOIN Users u ON s.studentId = u.id
       JOIN Assignments a ON s.assignmentId = a.id
+      JOIN CourseEnrollments ce ON a.courseEnrollmentId = ce.id
       WHERE s.id = @id
     `,
       { id },
@@ -331,6 +334,20 @@ const getSubmissionDetail = async (req, res) => {
     }
 
     const submission = result.recordset[0];
+
+    if (
+      role === "student" &&
+      String(submission.studentId) !== String(currentUserId)
+    ) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    if (
+      role === "teacher" &&
+      String(submission.teacherId) !== String(currentUserId)
+    ) {
+      return res.status(403).json({ error: "Access denied" });
+    }
 
     if (submission.assignmentType === "quiz") {
       const answers = await query(
