@@ -92,9 +92,9 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-app.get('/', (req, res) => {
-    res.send("API working")
-})
+app.get("/", (req, res) => {
+  res.send("API working");
+});
 
 // 404 handler
 app.use((req, res) => {
@@ -103,9 +103,15 @@ app.use((req, res) => {
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(err.status || 500).json({
-    error: err.message || "Internal server error",
+  const status = Number.isInteger(err.status) ? err.status : 500;
+  const isServerError = status >= 500;
+
+  if (isServerError) {
+    console.error(err.stack || err);
+  }
+
+  res.status(status).json({
+    error: isServerError ? "Internal server error" : err.message,
     ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
   });
 });
