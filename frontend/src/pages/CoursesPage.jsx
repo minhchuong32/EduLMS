@@ -182,21 +182,17 @@ export default function CoursesPage() {
     );
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto">
+    <div className="page-shell">
       <div className="mb-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-gray-900">
-              {title}
-            </h1>
-            <p className="text-gray-500 text-sm mt-0.5">
-              {courses.length} môn học
-            </p>
+            <h1 className="page-title text-2xl md:text-3xl">{title}</h1>
+            <p className="page-subtitle mt-1">{courses.length} môn học</p>
           </div>
           {isAdmin && (
             <button
               onClick={openCreate}
-              className="inline-flex items-center gap-1.5 bg-blue-600 text-white px-3 md:px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700"
+              className="soft-button-primary px-3 md:px-4 py-2.5"
             >
               <PlusIcon className="w-4 h-4" />
               <span className="hidden sm:inline">Thêm khóa học</span>
@@ -207,7 +203,7 @@ export default function CoursesPage() {
       </div>
 
       {courses.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
+        <div className="section-card text-center py-16">
           <BookOpenIcon className="w-14 h-14 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500">Chưa có môn học nào</p>
         </div>
@@ -216,7 +212,7 @@ export default function CoursesPage() {
           {courses.map((course, i) => (
             <div
               key={course.id}
-              className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md active:scale-[0.98] transition-all group"
+              className="section-card overflow-hidden transition-all group hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99]"
             >
               <div className={`${COLORS[i % COLORS.length]} h-1.5`} />
               <div className="p-4 md:p-5">

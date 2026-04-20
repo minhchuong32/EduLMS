@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
 
 // Pages
 import LoginPage from "./pages/LoginPage";
@@ -114,10 +115,12 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-        <ToastContainer position="top-right" autoClose={3000} />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppRoutes />
+          <ToastContainer position="top-right" autoClose={3000} />
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

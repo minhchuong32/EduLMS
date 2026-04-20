@@ -77,14 +77,14 @@ export function ClassesPage() {
     );
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto">
+    <div className="page-shell max-w-5xl">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">Lớp học</h1>
+        <h1 className="page-title text-2xl md:text-3xl">Lớp học</h1>
         {user.role === "admin" && (
           <button
             onClick={openCreate}
-            className="flex items-center gap-1.5 bg-blue-600 text-white px-3 md:px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700"
+            className="soft-button-primary px-3 md:px-4 py-2.5"
           >
             <PlusIcon className="w-4 h-4" />
             <span className="hidden sm:inline">Tạo lớp mới</span>
@@ -96,12 +96,12 @@ export function ClassesPage() {
       {/* Form tạo lớp — bottom sheet trên mobile */}
       {showForm && (
         <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg p-5">
+          <div className="section-card w-full sm:max-w-lg p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-gray-800">Tạo lớp học mới</h2>
               <button
                 onClick={() => setShowForm(false)}
-                className="p-1 rounded-lg hover:bg-gray-100"
+                className="p-1 rounded-lg hover:bg-slate-100"
               >
                 <XMarkIcon className="w-5 h-5 text-gray-400" />
               </button>
@@ -122,7 +122,7 @@ export function ClassesPage() {
                       setForm({ ...form, teacherId: e.target.value })
                     }
                     required
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="soft-select"
                   >
                     <option value="">-- Chọn giáo viên --</option>
                     {teachers.map((teacher) => (
@@ -142,7 +142,7 @@ export function ClassesPage() {
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   required
                   placeholder="VD: 10A1"
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="soft-input"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -155,7 +155,7 @@ export function ClassesPage() {
                     onChange={(e) =>
                       setForm({ ...form, gradeLevel: e.target.value })
                     }
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="soft-select"
                   >
                     {["10", "11", "12"].map((g) => (
                       <option key={g} value={g}>
@@ -175,7 +175,7 @@ export function ClassesPage() {
                     }
                     required
                     placeholder="2024-2025"
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="soft-input"
                   />
                 </div>
               </div>
@@ -183,14 +183,14 @@ export function ClassesPage() {
                 <button
                   type="submit"
                   disabled={optionsLoading || !form.teacherId}
-                  className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700"
+                  className="soft-button-primary flex-1 py-3"
                 >
                   Tạo lớp
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="flex-1 py-3 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50"
+                  className="soft-button-secondary flex-1 py-3"
                 >
                   Hủy
                 </button>
@@ -202,7 +202,7 @@ export function ClassesPage() {
 
       {/* Grid lớp học */}
       {classes.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
+        <div className="section-card text-center py-16">
           <UserGroupIcon className="w-14 h-14 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-400">Chưa có lớp học nào</p>
         </div>
@@ -212,9 +212,9 @@ export function ClassesPage() {
             <Link
               key={cls.id}
               to={`/classes/${cls.id}`}
-              className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 hover:shadow-md active:scale-[0.97] transition-all"
+              className="section-card p-4 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99] transition-all"
             >
-              <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-600 rounded-xl flex items-center justify-center mb-3">
+              <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-blue-600 via-indigo-600 to-cyan-500 rounded-2xl flex items-center justify-center mb-3 shadow-sm">
                 <span className="text-white font-bold text-base md:text-lg">
                   {cls.gradeLevel}
                 </span>
