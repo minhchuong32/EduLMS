@@ -18,7 +18,6 @@ const submissionRoutes = require("./routes/submission.routes");
 const announcementRoutes = require("./routes/announcement.routes");
 const notificationRoutes = require("./routes/notification.routes");
 const dashboardRoutes = require("./routes/dashboard.routes");
-const aiRoutes = require("./routes/ai.routes");
 
 const app = express();
 
@@ -73,7 +72,14 @@ if (process.env.NODE_ENV !== "test") {
 }
 
 // Static files (note: Vercel filesystem is ephemeral)
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "../uploads"), {
+    setHeaders: (res) => {
+      res.setHeader("X-Content-Type-Options", "nosniff");
+    },
+  }),
+);
 
 // API Routes
 app.use("/api/auth", authRoutes);
@@ -87,7 +93,6 @@ app.use("/api/submissions", submissionRoutes);
 app.use("/api/announcements", announcementRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/ai", aiRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {

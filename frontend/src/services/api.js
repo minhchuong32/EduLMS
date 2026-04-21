@@ -175,11 +175,6 @@ export const assignmentApi = {
   delete: (id) => api.delete(`/assignments/${id}`),
 };
 
-// AI assistant
-export const aiApi = {
-  generate: (data) => api.post("/ai/generate", data),
-};
-
 // Submissions
 export const submissionApi = {
   start: (assignmentId) => api.post("/submissions/start", { assignmentId }),

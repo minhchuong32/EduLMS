@@ -1,5 +1,20 @@
 const { query, withTransaction } = require("../config/database");
 
+const ensureTeacherOwnsAssignment = async (assignmentId, teacherId) => {
+  const check = await query(
+    `
+      SELECT 1
+      FROM Assignments a
+      JOIN CourseEnrollments ce ON a.courseEnrollmentId = ce.id
+      WHERE a.id = @assignmentId AND ce.teacherId = @teacherId
+      LIMIT 1
+    `,
+    { assignmentId, teacherId },
+  );
+
+  return check.recordset.length > 0;
+};
+
 // POST /api/submissions/start
 const startSubmission = async (req, res) => {
   try {
@@ -8,8 +23,17 @@ const startSubmission = async (req, res) => {
 
     // Check assignment
     const assignmentResult = await query(
-      "SELECT * FROM Assignments WHERE id = @id AND isPublished = true",
-      { id: assignmentId },
+      `
+        SELECT a.*
+        FROM Assignments a
+        JOIN CourseEnrollments ce ON a.courseEnrollmentId = ce.id
+        JOIN StudentClasses sc ON sc.classId = ce.classId
+        WHERE a.id = @id
+          AND a.isPublished = true
+          AND sc.studentId = @studentId
+          AND (a.startDate IS NULL OR a.startDate <= NOW())
+      `,
+      { id: assignmentId, studentId },
     );
     if (!assignmentResult.recordset.length) {
       return res
@@ -251,6 +275,29 @@ const gradeSubmission = async (req, res) => {
     const { score, feedback } = req.body;
     const teacherId = req.user.id;
 
+    const submissionOwnerCheck = await query(
+      `
+        SELECT s.assignmentId
+        FROM Submissions s
+        WHERE s.id = @id
+      `,
+      { id },
+    );
+
+    if (!submissionOwnerCheck.recordset.length) {
+      return res.status(404).json({ error: "Submission not found" });
+    }
+
+    if (req.user.role === "teacher") {
+      const hasAccess = await ensureTeacherOwnsAssignment(
+        submissionOwnerCheck.recordset[0].assignmentId,
+        teacherId,
+      );
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
+
     await query(
       `
       UPDATE Submissions SET
@@ -290,6 +337,16 @@ const gradeSubmission = async (req, res) => {
 const getSubmissionsByAssignment = async (req, res) => {
   try {
     const { assignmentId } = req.params;
+
+    if (req.user.role === "teacher") {
+      const hasAccess = await ensureTeacherOwnsAssignment(
+        assignmentId,
+        req.user.id,
+      );
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
 
     const result = await query(
       `

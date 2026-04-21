@@ -9,7 +9,6 @@ import {
   ArrowRightIcon,
 } from "@heroicons/react/24/outline";
 import { format } from "date-fns";
-import AIAssistantPanel from "../components/ai/AIAssistantPanel";
 
 export default function AssignmentDetailPage() {
   const { id } = useParams();
@@ -128,22 +127,6 @@ export default function AssignmentDetailPage() {
     file: "bg-green-100 text-green-700",
   };
 
-  const aiContext = [
-    `Bài tập: ${assignment.title}`,
-    `Loại bài tập: ${TYPE_LABELS[assignment.type]}`,
-    assignment.description ? `Mô tả:\n${assignment.description}` : null,
-    Array.isArray(assignment.questions) && assignment.questions.length > 0
-      ? `Danh sách câu hỏi hiện có:\n${assignment.questions
-          .map(
-            (question, index) =>
-              `${index + 1}. ${question.questionText || question.question || ""}`,
-          )
-          .join("\n")}`
-      : null,
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-
   return (
     <div className="max-w-3xl mx-auto p-3 md:p-6">
       {/* Info */}
@@ -177,17 +160,6 @@ export default function AssignmentDetailPage() {
           <p>Số lần làm: {assignment.maxAttempts}</p>
         </div>
       </div>
-
-      <AIAssistantPanel
-        title="Trợ lý AI cho bài tập"
-        description="Sinh rubric chấm điểm, tóm tắt yêu cầu hoặc tạo câu hỏi luyện tập từ bài tập hiện có."
-        content={aiContext}
-        subject={assignment.title}
-        role={user?.role}
-        defaultMode={assignment.type === "essay" ? "rubric" : "questions"}
-        assignmentType={assignment.type}
-        audience={user?.role === "student" ? "Học sinh" : "Giáo viên"}
-      />
 
       {/* Student */}
       {user?.role === "student" && (
