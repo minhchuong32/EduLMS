@@ -110,6 +110,17 @@ export const classApi = {
     api.delete(`/classes/${classId}/students/${studentId}`),
 };
 
+// Timetable
+export const classScheduleApi = {
+  getSchedules: (classId) => api.get(`/classes/${classId}/schedules`),
+  createSchedule: (classId, data) =>
+    api.post(`/classes/${classId}/schedules`, data),
+  updateSchedule: (classId, scheduleId, data) =>
+    api.put(`/classes/${classId}/schedules/${scheduleId}`, data),
+  deleteSchedule: (classId, scheduleId) =>
+    api.delete(`/classes/${classId}/schedules/${scheduleId}`),
+};
+
 // Subjects
 export const subjectApi = {
   getAll: () => api.get("/subjects"),
@@ -162,6 +173,11 @@ export const assignmentApi = {
   publish: (id, publish) =>
     api.patch(`/assignments/${id}/publish`, { publish }),
   delete: (id) => api.delete(`/assignments/${id}`),
+};
+
+// AI assistant
+export const aiApi = {
+  generate: (data) => api.post("/ai/generate", data),
 };
 
 // Submissions

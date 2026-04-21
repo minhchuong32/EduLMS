@@ -1,10 +1,15 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { assignmentApi, submissionApi } from '../services/api';
-import { useAuth } from '../context/AuthContext';
-import { toast } from 'react-toastify';
-import { ClockIcon, DocumentTextIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
-import { format } from 'date-fns';
+import React, { useEffect, useState, useCallback } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { assignmentApi, submissionApi } from "../services/api";
+import { useAuth } from "../context/AuthContext";
+import { toast } from "react-toastify";
+import {
+  ClockIcon,
+  DocumentTextIcon,
+  ArrowRightIcon,
+} from "@heroicons/react/24/outline";
+import { format } from "date-fns";
+import AIAssistantPanel from "../components/ai/AIAssistantPanel";
 
 export default function AssignmentDetailPage() {
   const { id } = useParams();
@@ -13,7 +18,7 @@ export default function AssignmentDetailPage() {
 
   const [assignment, setAssignment] = useState(null);
   const [mySubmissions, setMySubmissions] = useState([]);
-  const [essayContent, setEssayContent] = useState('');
+  const [essayContent, setEssayContent] = useState("");
   const [file, setFile] = useState(null);
 
   const [loading, setLoading] = useState(true);
@@ -32,7 +37,7 @@ export default function AssignmentDetailPage() {
       const assignmentRes = await assignmentApi.getById(id);
       setAssignment(assignmentRes.data);
 
-      if (user.role === 'student') {
+      if (user.role === "student") {
         const submissionRes = await submissionApi.getMy(id);
         setMySubmissions(submissionRes.data);
       }
@@ -40,7 +45,7 @@ export default function AssignmentDetailPage() {
       setLoaded(true); //  chỉ load 1 lần
     } catch (err) {
       console.error(err);
-      toast.error('Không thể tải dữ liệu');
+      toast.error("Không thể tải dữ liệu");
     } finally {
       setLoading(false);
     }
@@ -59,7 +64,7 @@ export default function AssignmentDetailPage() {
       await submissionApi.start(id);
       navigate(`/assignments/${id}/quiz`);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Không thể bắt đầu bài thi');
+      toast.error(err.response?.data?.error || "Không thể bắt đầu bài thi");
     } finally {
       setStarting(false);
     }
@@ -76,13 +81,13 @@ export default function AssignmentDetailPage() {
       const sub = await submissionApi.start(id);
       await submissionApi.submitEssay(sub.data.id, { essayContent, file });
 
-      toast.success('Nộp bài thành công!');
+      toast.success("Nộp bài thành công!");
 
       // reload submissions
       const r = await submissionApi.getMy(id);
       setMySubmissions(r.data);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Nộp bài thất bại');
+      toast.error(err.response?.data?.error || "Nộp bài thất bại");
     } finally {
       setSubmitting(false);
     }
@@ -99,34 +104,63 @@ export default function AssignmentDetailPage() {
   }
 
   if (!assignment) {
-    return <div className="p-6 text-center text-gray-500">Không tìm thấy bài tập</div>;
+    return (
+      <div className="p-6 text-center text-gray-500">
+        Không tìm thấy bài tập
+      </div>
+    );
   }
 
-  const isSubmitted = mySubmissions.some(s => s.status !== 'in_progress');
-  const canSubmit = !isSubmitted || mySubmissions.length < assignment.maxAttempts;
-  const isPastDue = assignment.dueDate && new Date() > new Date(assignment.dueDate);
+  const isSubmitted = mySubmissions.some((s) => s.status !== "in_progress");
+  const canSubmit =
+    !isSubmitted || mySubmissions.length < assignment.maxAttempts;
+  const isPastDue =
+    assignment.dueDate && new Date() > new Date(assignment.dueDate);
 
-  const TYPE_LABELS = { quiz: 'Trắc nghiệm', essay: 'Tự luận', file: 'Nộp file' };
-  const TYPE_COLORS = {
-    quiz: 'bg-purple-100 text-purple-700',
-    essay: 'bg-blue-100 text-blue-700',
-    file: 'bg-green-100 text-green-700',
+  const TYPE_LABELS = {
+    quiz: "Trắc nghiệm",
+    essay: "Tự luận",
+    file: "Nộp file",
   };
+  const TYPE_COLORS = {
+    quiz: "bg-purple-100 text-purple-700",
+    essay: "bg-blue-100 text-blue-700",
+    file: "bg-green-100 text-green-700",
+  };
+
+  const aiContext = [
+    `Bài tập: ${assignment.title}`,
+    `Loại bài tập: ${TYPE_LABELS[assignment.type]}`,
+    assignment.description ? `Mô tả:\n${assignment.description}` : null,
+    Array.isArray(assignment.questions) && assignment.questions.length > 0
+      ? `Danh sách câu hỏi hiện có:\n${assignment.questions
+          .map(
+            (question, index) =>
+              `${index + 1}. ${question.questionText || question.question || ""}`,
+          )
+          .join("\n")}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   return (
     <div className="max-w-3xl mx-auto p-3 md:p-6">
-
       {/* Info */}
       <div className="bg-white rounded-2xl shadow-sm border p-4 md:p-6 mb-4">
         <div className="flex justify-between mb-3">
           <div>
-            <span className={`text-xs px-2 py-0.5 rounded ${TYPE_COLORS[assignment.type]}`}>
+            <span
+              className={`text-xs px-2 py-0.5 rounded ${TYPE_COLORS[assignment.type]}`}
+            >
               {TYPE_LABELS[assignment.type]}
             </span>
             <h1 className="text-xl font-bold mt-2">{assignment.title}</h1>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-bold text-blue-600">{assignment.totalPoints}</p>
+            <p className="text-2xl font-bold text-blue-600">
+              {assignment.totalPoints}
+            </p>
           </div>
         </div>
 
@@ -136,18 +170,31 @@ export default function AssignmentDetailPage() {
 
         <div className="text-sm text-gray-500 space-y-1">
           {assignment.dueDate && (
-            <p>Hạn: {format(new Date(assignment.dueDate), 'dd/MM/yyyy HH:mm')}</p>
+            <p>
+              Hạn: {format(new Date(assignment.dueDate), "dd/MM/yyyy HH:mm")}
+            </p>
           )}
           <p>Số lần làm: {assignment.maxAttempts}</p>
         </div>
       </div>
 
+      <AIAssistantPanel
+        title="Trợ lý AI cho bài tập"
+        description="Sinh rubric chấm điểm, tóm tắt yêu cầu hoặc tạo câu hỏi luyện tập từ bài tập hiện có."
+        content={aiContext}
+        subject={assignment.title}
+        role={user?.role}
+        defaultMode={assignment.type === "essay" ? "rubric" : "questions"}
+        assignmentType={assignment.type}
+        audience={user?.role === "student" ? "Học sinh" : "Giáo viên"}
+      />
+
       {/* Student */}
-      {user?.role === 'student' && (
+      {user?.role === "student" && (
         <div className="bg-white rounded-2xl shadow-sm border p-4 md:p-6 mb-4">
           <h2 className="font-bold mb-4">Bài làm của tôi</h2>
 
-          {mySubmissions.map(sub => (
+          {mySubmissions.map((sub) => (
             <div key={sub.id} className="border p-3 rounded mb-2">
               <p className="text-sm">Trạng thái: {sub.status}</p>
               {sub.score != null && <p>Điểm: {sub.score}</p>}
@@ -156,34 +203,37 @@ export default function AssignmentDetailPage() {
 
           {canSubmit && !isPastDue && (
             <>
-              {assignment.type === 'quiz' && (
+              {assignment.type === "quiz" && (
                 <button
                   onClick={handleStartQuiz}
                   disabled={starting}
                   className="bg-purple-600 text-white px-4 py-2 rounded mt-3"
                 >
-                  {starting ? 'Đang xử lý...' : 'Bắt đầu làm bài'}
+                  {starting ? "Đang xử lý..." : "Bắt đầu làm bài"}
                 </button>
               )}
 
-              {(assignment.type === 'essay' || assignment.type === 'file') && (
+              {(assignment.type === "essay" || assignment.type === "file") && (
                 <form onSubmit={handleSubmitEssay} className="space-y-3 mt-3">
-                  {assignment.type === 'essay' && (
+                  {assignment.type === "essay" && (
                     <textarea
                       value={essayContent}
-                      onChange={e => setEssayContent(e.target.value)}
+                      onChange={(e) => setEssayContent(e.target.value)}
                       className="w-full border p-2 rounded"
                     />
                   )}
 
-                  <input type="file" onChange={e => setFile(e.target.files[0])} />
+                  <input
+                    type="file"
+                    onChange={(e) => setFile(e.target.files[0])}
+                  />
 
                   <button
                     type="submit"
                     disabled={submitting}
                     className="bg-blue-600 text-white px-4 py-2 rounded"
                   >
-                    {submitting ? 'Đang nộp...' : 'Nộp bài'}
+                    {submitting ? "Đang nộp..." : "Nộp bài"}
                   </button>
                 </form>
               )}
@@ -193,10 +243,8 @@ export default function AssignmentDetailPage() {
       )}
 
       {/* Teacher */}
-      {(user?.role === 'teacher' || user?.role === 'admin') && (
-        <Link to={`/assignments/${id}/submissions`}>
-          Xem bài nộp →
-        </Link>
+      {(user?.role === "teacher" || user?.role === "admin") && (
+        <Link to={`/assignments/${id}/submissions`}>Xem bài nộp →</Link>
       )}
     </div>
   );

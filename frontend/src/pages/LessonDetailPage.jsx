@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
 import { PaperClipIcon, ChatBubbleLeftIcon } from "@heroicons/react/24/outline";
 import { format } from "date-fns";
+import AIAssistantPanel from "../components/ai/AIAssistantPanel";
 
 const FILE_BASE_URL = (
   process.env.REACT_APP_API_URL || "http://localhost:5000/api"
@@ -67,6 +68,14 @@ export default function LessonDetailPage() {
 
   const embedUrl = getEmbedUrl(lesson.videoUrl);
   const comments = lesson.comments || [];
+  const aiContext = [
+    `Bài giảng: ${lesson.title}`,
+    lesson.subjectName ? `Môn học: ${lesson.subjectName}` : null,
+    lesson.teacherName ? `Giáo viên: ${lesson.teacherName}` : null,
+    lesson.content ? `Nội dung bài giảng:\n${lesson.content}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
   const commentMap = comments.reduce((acc, item) => {
     acc[item.id] = { ...item, children: [] };
     return acc;
@@ -171,6 +180,16 @@ export default function LessonDetailPage() {
           </div>
         )}
       </div>
+
+      <AIAssistantPanel
+        title="Trợ lý AI cho bài giảng"
+        description="Tóm tắt nội dung bài giảng, tạo câu hỏi hoặc giải thích theo mức độ cho học sinh."
+        content={aiContext}
+        subject={lesson.subjectName}
+        role={user?.role}
+        defaultMode="summary"
+        audience={user?.role === "student" ? "Học sinh" : "Giáo viên"}
+      />
 
       {/* Comments */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">

@@ -20,6 +20,7 @@ import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import CreateLessonModal from "../components/teacher/CreateLessonModal";
 import CreateAssignmentModal from "../components/teacher/CreateAssignmentModal";
+import AIAssistantPanel from "../components/ai/AIAssistantPanel";
 
 const TABS = ["Bài giảng", "Bài tập", "Thông báo"];
 
@@ -217,6 +218,26 @@ export default function CourseDetailPage() {
     toast.success("Đã cập nhật bài tập");
   };
 
+  const aiContext = course
+    ? [
+        `Khóa học: ${course.subjectName}`,
+        course.className ? `Lớp: ${course.className}` : null,
+        course.subjectDescription
+          ? `Mô tả: ${course.subjectDescription}`
+          : null,
+        lessons.length > 0
+          ? `Bài giảng hiện có: ${lessons.map((lesson) => lesson.title).join(", ")}`
+          : null,
+        assignments.length > 0
+          ? `Bài tập hiện có: ${assignments
+              .map((assignment) => `${assignment.title} (${assignment.type})`)
+              .join(", ")}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join("\n")
+    : "";
+
   if (loading)
     return (
       <div className="flex justify-center items-center h-64">
@@ -257,6 +278,16 @@ export default function CourseDetailPage() {
           </p>
         )}
       </div>
+
+      <AIAssistantPanel
+        title={`Trợ lý AI cho ${course.subjectName}`}
+        description="Tạo câu hỏi, tóm tắt hoặc giải thích nội dung của toàn bộ khóa học hiện tại."
+        content={aiContext}
+        subject={course.subjectName}
+        role={user?.role}
+        defaultMode="summary"
+        audience={user?.role === "student" ? "Học sinh" : "Giáo viên"}
+      />
 
       {/* Tabs */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">

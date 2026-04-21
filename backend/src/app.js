@@ -18,6 +18,7 @@ const submissionRoutes = require("./routes/submission.routes");
 const announcementRoutes = require("./routes/announcement.routes");
 const notificationRoutes = require("./routes/notification.routes");
 const dashboardRoutes = require("./routes/dashboard.routes");
+const aiRoutes = require("./routes/ai.routes");
 
 const app = express();
 
@@ -86,6 +87,7 @@ app.use("/api/submissions", submissionRoutes);
 app.use("/api/announcements", announcementRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/ai", aiRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {

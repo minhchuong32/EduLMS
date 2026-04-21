@@ -239,6 +239,24 @@ const migrate = async () => {
     `);
 
     await query(`
+      CREATE TABLE IF NOT EXISTS timetablesessions (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        classId uuid NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+        courseEnrollmentId uuid NOT NULL REFERENCES courseenrollments(id) ON DELETE CASCADE,
+        dayOfWeek int NOT NULL CHECK (dayOfWeek BETWEEN 0 AND 6),
+        startTime time NOT NULL,
+        endTime time NOT NULL,
+        roomName varchar(100),
+        note text,
+        isActive boolean NOT NULL DEFAULT true,
+        createdBy uuid REFERENCES users(id),
+        updatedBy uuid REFERENCES users(id),
+        createdAt timestamptz NOT NULL DEFAULT now(),
+        updatedAt timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+
+    await query(`
       CREATE TABLE IF NOT EXISTS announcements (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         courseEnrollmentId uuid REFERENCES courseenrollments(id),
