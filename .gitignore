@@ -16,5 +16,6 @@ backend/uploads/*
 .vscode/
 .i  dea/
 
-docs/
-deploy/
+# Ignore top-level documentation and deployment folders
+/docs/
+/deploy/
