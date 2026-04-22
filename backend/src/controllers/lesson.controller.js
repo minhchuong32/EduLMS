@@ -1,4 +1,4 @@
-const { query } = require("../config/database");
+const { query, withTransaction } = require("../config/database");
 const { asyncHandler } = require("../utils/asyncHandler");
 const { createHttpError } = require("../utils/httpError");
 
@@ -202,6 +202,72 @@ const addComment = asyncHandler(async (req, res) => {
   res.status(201).json(result.recordset[0]);
 });
 
+// PUT /api/lessons/:id/comments/:commentId
+const updateComment = asyncHandler(async (req, res) => {
+  const { id, commentId } = req.params;
+  const { content } = req.body;
+
+  if (!content || !String(content).trim()) {
+    throw createHttpError(400, "Comment content is required");
+  }
+
+  const result = await query(
+    `
+      UPDATE Comments
+      SET content = @content,
+          updatedAt = NOW()
+      WHERE id = @commentId AND lessonId = @lessonId
+      RETURNING *
+    `,
+    {
+      lessonId: id,
+      commentId,
+      content: String(content).trim(),
+    },
+  );
+
+  if (!result.recordset.length) {
+    throw createHttpError(404, "Comment not found");
+  }
+
+  res.json(result.recordset[0]);
+});
+
+// DELETE /api/lessons/:id/comments/:commentId
+const deleteComment = asyncHandler(async (req, res) => {
+  const { id, commentId } = req.params;
+
+  const result = await withTransaction(async (client) =>
+    query(
+      `
+        WITH RECURSIVE descendants AS (
+          SELECT id
+          FROM Comments
+          WHERE id = @commentId AND lessonId = @lessonId
+          UNION ALL
+          SELECT c.id
+          FROM Comments c
+          INNER JOIN descendants d ON c.parentId = d.id
+        )
+        DELETE FROM Comments
+        WHERE id IN (SELECT id FROM descendants)
+        RETURNING id
+      `,
+      {
+        lessonId: id,
+        commentId,
+      },
+      client,
+    ),
+  );
+
+  if (!result.recordset.length) {
+    throw createHttpError(404, "Comment not found");
+  }
+
+  res.json({ message: "Comment deleted" });
+});
+
 module.exports = {
   getLessonsByCourse,
   getLesson,
@@ -210,4 +276,6 @@ module.exports = {
   publishLesson,
   deleteLesson,
   addComment,
+  updateComment,
+  deleteComment,
 };

@@ -162,6 +162,10 @@ export const lessonApi = {
   publish: (id, publish) => api.patch(`/lessons/${id}/publish`, { publish }),
   delete: (id) => api.delete(`/lessons/${id}`),
   addComment: (id, data) => api.post(`/lessons/${id}/comments`, data),
+  updateComment: (lessonId, commentId, data) =>
+    api.put(`/lessons/${lessonId}/comments/${commentId}`, data),
+  deleteComment: (lessonId, commentId) =>
+    api.delete(`/lessons/${lessonId}/comments/${commentId}`),
 };
 
 // Assignments

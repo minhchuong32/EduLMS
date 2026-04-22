@@ -16,7 +16,10 @@ export default function LessonDetailPage() {
   const [lesson, setLesson] = useState(null);
   const [comment, setComment] = useState("");
   const [replyTo, setReplyTo] = useState(null);
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editComment, setEditComment] = useState("");
   const [loading, setLoading] = useState(true);
+  const canManageComments = ["admin", "teacher"].includes(user?.role);
 
   useEffect(() => {
     lessonApi
@@ -40,6 +43,39 @@ export default function LessonDetailPage() {
       toast.success("Đã thêm bình luận");
     } catch (err) {
       toast.error(err.response?.data?.error || "Không thể thêm bình luận");
+    }
+  };
+
+  const handleEditComment = async (e) => {
+    e.preventDefault();
+    if (!editComment.trim() || !editingCommentId) return;
+
+    try {
+      await lessonApi.updateComment(id, editingCommentId, {
+        content: editComment,
+      });
+      const { data } = await lessonApi.getById(id);
+      setLesson(data);
+      setEditingCommentId(null);
+      setEditComment("");
+      toast.success("Đã cập nhật bình luận");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Không thể cập nhật bình luận");
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm("Bạn có chắc muốn xóa bình luận này không?")) return;
+
+    try {
+      await lessonApi.deleteComment(id, commentId);
+      const { data } = await lessonApi.getById(id);
+      setLesson(data);
+      setEditingCommentId(null);
+      setEditComment("");
+      toast.success("Đã xóa bình luận");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Không thể xóa bình luận");
     }
   };
 
@@ -107,13 +143,64 @@ export default function LessonDetailPage() {
           <p className="text-sm text-gray-700 whitespace-pre-wrap">
             {item.content}
           </p>
-          <button
-            type="button"
-            onClick={() => setReplyTo(item)}
-            className="mt-1 text-xs text-blue-600 hover:text-blue-700 font-medium"
-          >
-            Trả lời
-          </button>
+          <div className="mt-1 flex flex-wrap gap-3 text-xs font-medium">
+            <button
+              type="button"
+              onClick={() => setReplyTo(item)}
+              className="text-blue-600 hover:text-blue-700"
+            >
+              Trả lời
+            </button>
+            {canManageComments && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingCommentId(item.id);
+                    setEditComment(item.content);
+                  }}
+                  className="text-amber-600 hover:text-amber-700"
+                >
+                  Sửa
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteComment(item.id)}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  Xóa
+                </button>
+              </>
+            )}
+          </div>
+          {editingCommentId === item.id && (
+            <form onSubmit={handleEditComment} className="mt-3 space-y-2">
+              <textarea
+                value={editComment}
+                onChange={(e) => setEditComment(e.target.value)}
+                rows={3}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  className="px-3 py-2 bg-blue-600 text-white rounded-xl text-xs hover:bg-blue-700"
+                >
+                  Lưu
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingCommentId(null);
+                    setEditComment("");
+                  }}
+                  className="px-3 py-2 bg-gray-100 text-gray-700 rounded-xl text-xs hover:bg-gray-200"
+                >
+                  Hủy
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
       {item.children?.length > 0 && (
