@@ -15,3 +15,6 @@ backend/uploads/*
 *.log
 .vscode/
 .i  dea/
+
+docs/
+deploy/
