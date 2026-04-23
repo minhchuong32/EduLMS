@@ -22,41 +22,133 @@ import {
   BellIcon,
   MagnifyingGlassIcon,
   TrashIcon,
+  Cog6ToothIcon,
+  CheckIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-toastify";
 import { useTheme } from "../../context/ThemeContext";
-import { notificationApi } from "../../services/api";
+import { classApi, courseApi, notificationApi } from "../../services/api";
 import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
+import { enUS } from "date-fns/locale";
 
 const FILE_BASE_URL = (
   process.env.REACT_APP_API_URL || "http://localhost:5000/api"
 ).replace(/\/api\/?$/, "");
 
 const NAV_ITEMS = {
-  admin: [
-    { to: "/dashboard", icon: HomeIcon, label: "Tổng quan" },
-    { to: "/courses", icon: BookOpenIcon, label: "Khóa học" },
-    { to: "/classes", icon: AcademicCapIcon, label: "Lớp học" },
-    { to: "/users", icon: UsersIcon, label: "Người dùng" },
-    { to: "/announcements", icon: MegaphoneIcon, label: "Thông báo hệ thống" },
-  ],
-  teacher: [
-    { to: "/dashboard", icon: HomeIcon, label: "Tổng quan" },
-    { to: "/courses", icon: BookOpenIcon, label: "Môn học" },
-    { to: "/classes", icon: AcademicCapIcon, label: "Lớp học" },
-    { to: "/announcements", icon: MegaphoneIcon, label: "Thông báo hệ thống" },
-  ],
-  student: [
-    { to: "/dashboard", icon: HomeIcon, label: "Tổng quan" },
-    { to: "/courses", icon: BookOpenIcon, label: "Môn học" },
-  ],
+  vi: {
+    admin: [
+      { to: "/dashboard", icon: HomeIcon, label: "Tổng quan" },
+      { to: "/courses", icon: BookOpenIcon, label: "Khóa học" },
+      { to: "/classes", icon: AcademicCapIcon, label: "Lớp học" },
+      { to: "/users", icon: UsersIcon, label: "Người dùng" },
+      {
+        to: "/announcements",
+        icon: MegaphoneIcon,
+        label: "Thông báo hệ thống",
+      },
+    ],
+    teacher: [
+      { to: "/dashboard", icon: HomeIcon, label: "Tổng quan" },
+      { to: "/courses", icon: BookOpenIcon, label: "Môn học" },
+      { to: "/classes", icon: AcademicCapIcon, label: "Lớp học" },
+      {
+        to: "/announcements",
+        icon: MegaphoneIcon,
+        label: "Thông báo hệ thống",
+      },
+    ],
+    student: [
+      { to: "/dashboard", icon: HomeIcon, label: "Tổng quan" },
+      { to: "/courses", icon: BookOpenIcon, label: "Môn học" },
+    ],
+  },
+  en: {
+    admin: [
+      { to: "/dashboard", icon: HomeIcon, label: "Dashboard" },
+      { to: "/courses", icon: BookOpenIcon, label: "Courses" },
+      { to: "/classes", icon: AcademicCapIcon, label: "Classes" },
+      { to: "/users", icon: UsersIcon, label: "Users" },
+      {
+        to: "/announcements",
+        icon: MegaphoneIcon,
+        label: "System Announcements",
+      },
+    ],
+    teacher: [
+      { to: "/dashboard", icon: HomeIcon, label: "Dashboard" },
+      { to: "/courses", icon: BookOpenIcon, label: "Courses" },
+      { to: "/classes", icon: AcademicCapIcon, label: "Classes" },
+      {
+        to: "/announcements",
+        icon: MegaphoneIcon,
+        label: "System Announcements",
+      },
+    ],
+    student: [
+      { to: "/dashboard", icon: HomeIcon, label: "Dashboard" },
+      { to: "/courses", icon: BookOpenIcon, label: "Courses" },
+    ],
+  },
 };
 
 const ROLE_LABELS = {
-  admin: "Quản trị viên",
-  teacher: "Giáo viên",
-  student: "Học sinh",
+  vi: {
+    admin: "Quản trị viên",
+    teacher: "Giáo viên",
+    student: "Học sinh",
+  },
+  en: {
+    admin: "Administrator",
+    teacher: "Teacher",
+    student: "Student",
+  },
+};
+
+const UI_TEXT = {
+  vi: {
+    search: "Tìm kiếm",
+    searchPlaceholder: "Tìm trang: bảng điều khiển, môn học, thông báo...",
+    mobileSearchPlaceholder: "Tìm nhanh trang...",
+    noSearchResult: "Không có kết quả phù hợp",
+    loadingSearch: "Đang tải dữ liệu tìm kiếm...",
+    goToPage: "Đi đến trang",
+    profile: "Hồ sơ",
+    logout: "Đăng xuất",
+    notificationTitle: "Tất cả thông báo",
+    notificationPageLink: "Xem trang thông báo",
+    noNotifications: "Không có thông báo",
+    settings: "Cài đặt",
+    language: "Ngôn ngữ",
+    appearance: "Giao diện",
+    vietnamese: "Tiếng Việt",
+    english: "English",
+    light: "Sáng",
+    dark: "Tối",
+    appSubtitle: "Nền tảng học tập số",
+  },
+  en: {
+    search: "Search",
+    searchPlaceholder: "Search pages: dashboard, courses, announcements...",
+    mobileSearchPlaceholder: "Quick search...",
+    noSearchResult: "No matching results",
+    loadingSearch: "Loading search data...",
+    goToPage: "Go to page",
+    profile: "Profile",
+    logout: "Sign out",
+    notificationTitle: "All notifications",
+    notificationPageLink: "Open notifications page",
+    noNotifications: "No notifications",
+    settings: "Settings",
+    language: "Language",
+    appearance: "Appearance",
+    vietnamese: "Tiếng Việt",
+    english: "English",
+    light: "Light",
+    dark: "Dark",
+    appSubtitle: "Digital learning platform",
+  },
 };
 
 const ROLE_COLORS = {
@@ -72,32 +164,95 @@ export default function Layout() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [language, setLanguage] = useState(
+    localStorage.getItem("layoutLang") === "en" ? "en" : "vi",
+  );
+  const [searchCatalog, setSearchCatalog] = useState({
+    courses: [],
+    classes: [],
+  });
+  const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
   const notificationPanelRef = useRef(null);
+  const mobileSettingsPanelRef = useRef(null);
+  const desktopSettingsPanelRef = useRef(null);
+  const searchPanelRef = useRef(null);
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
 
-  const navItems = NAV_ITEMS[user?.role] || [];
+  const navItems = NAV_ITEMS[language][user?.role] || [];
   const bottomNavItems = navItems.slice(0, 4);
   const isQuizRoute = /^\/assignments\/[^/]+\/quiz$/.test(location.pathname);
+  const t = UI_TEXT[language];
+  const roleLabels = ROLE_LABELS[language];
+  const dateLocale = language === "en" ? enUS : vi;
+
+  useEffect(() => {
+    localStorage.setItem("layoutLang", language);
+  }, [language]);
 
   const searchableRoutes = useMemo(
     () => [
-      ...navItems.map((item) => ({ keyword: item.label, to: item.to })),
-      { keyword: "thong bao", to: "/announcements" },
-      { keyword: "thong bao chi tiet", to: "/announcements" },
+      ...navItems.map((item) => ({
+        keyword: item.label,
+        title: item.label,
+        description: t.goToPage,
+        to: item.to,
+      })),
+      { keyword: "thong bao announcements", to: "/announcements" },
       {
-        keyword: "noti",
+        keyword: "thong bao chi tiet announcement details",
+        to: "/announcements",
+      },
+      {
+        keyword: "noti notification",
         to: user?.role === "admin" ? "/noti" : "/announcements",
       },
-      { keyword: "ho so", to: "/profile" },
+      { keyword: "ho so profile", to: "/profile" },
       { keyword: "profile", to: "/profile" },
-      { keyword: "dashboard", to: "/dashboard" },
-      { keyword: "trang chu", to: "/dashboard" },
+      { keyword: "dashboard tong quan", to: "/dashboard" },
+      { keyword: "trang chu home", to: "/dashboard" },
     ],
-    [navItems, user?.role],
+    [navItems, t.goToPage, user?.role],
   );
+
+  useEffect(() => {
+    let alive = true;
+
+    const loadSearchCatalog = async () => {
+      setSearchLoading(true);
+      try {
+        const [coursesRes, classesRes] = await Promise.all([
+          courseApi.getAll(),
+          user?.role === "admin" || user?.role === "teacher"
+            ? classApi.getAll()
+            : Promise.resolve({ data: [] }),
+        ]);
+
+        if (!alive) return;
+
+        setSearchCatalog({
+          courses: Array.isArray(coursesRes.data) ? coursesRes.data : [],
+          classes: Array.isArray(classesRes.data) ? classesRes.data : [],
+        });
+      } catch {
+        if (alive) {
+          setSearchCatalog({ courses: [], classes: [] });
+        }
+      } finally {
+        if (alive) setSearchLoading(false);
+      }
+    };
+
+    loadSearchCatalog();
+
+    return () => {
+      alive = false;
+    };
+  }, [user?.role]);
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -155,6 +310,41 @@ export default function Layout() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showNotifications]);
 
+  useEffect(() => {
+    if (!showSettings) return undefined;
+
+    const handleClickOutside = (event) => {
+      const inMobilePanel = mobileSettingsPanelRef.current?.contains(
+        event.target,
+      );
+      const inDesktopPanel = desktopSettingsPanelRef.current?.contains(
+        event.target,
+      );
+      if (!inMobilePanel && !inDesktopPanel) {
+        setShowSettings(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showSettings]);
+
+  useEffect(() => {
+    if (!showSearchSuggestions) return undefined;
+
+    const handleClickOutside = (event) => {
+      if (
+        searchPanelRef.current &&
+        !searchPanelRef.current.contains(event.target)
+      ) {
+        setShowSearchSuggestions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showSearchSuggestions]);
+
   const normalizeText = (value) =>
     value
       .normalize("NFD")
@@ -177,24 +367,78 @@ export default function Layout() {
     const keyword = normalizeText(searchTerm);
     if (!keyword) return;
 
-    const exactMatch = searchableRoutes.find(
-      (item) => normalizeText(item.keyword) === keyword,
-    );
-    const fuzzyMatch = searchableRoutes.find((item) =>
-      normalizeText(item.keyword).includes(keyword),
-    );
+    const firstMatch = searchSuggestions[0];
 
-    const destination = (exactMatch || fuzzyMatch)?.to;
-    if (!destination) {
-      toast.info("Không tìm thấy trang phù hợp");
+    if (!firstMatch) {
+      toast.info(t.noSearchResult);
       return;
     }
 
-    navigate(destination);
+    navigate(firstMatch.to);
+    setSearchTerm("");
+    setShowSearchSuggestions(false);
+    setMobileOpen(false);
+  };
+
+  const searchCandidates = useMemo(() => {
+    const routeCandidates = searchableRoutes.map((item) => ({
+      key: `route-${item.to}-${item.keyword}`,
+      title: item.title || item.keyword,
+      description: item.description || "Đi đến trang",
+      keyword: item.keyword,
+      to: item.to,
+    }));
+
+    const courseCandidates = searchCatalog.courses.map((course) => ({
+      key: `course-${course.id}`,
+      title: course.subjectName || (language === "en" ? "Course" : "Khóa học"),
+      description: course.className
+        ? `${language === "en" ? "Class" : "Lớp"} ${course.className}`
+        : language === "en"
+          ? "Course"
+          : "Khóa học",
+      keyword: `${course.subjectName || ""} ${course.subjectCode || ""} ${course.className || ""}`,
+      to: `/courses/${course.id}`,
+    }));
+
+    const classCandidates = searchCatalog.classes.map((cls) => ({
+      key: `class-${cls.id}`,
+      title: cls.name || (language === "en" ? "Class" : "Lớp học"),
+      description: cls.academicYear
+        ? `${language === "en" ? "Academic year" : "Năm học"} ${cls.academicYear}`
+        : language === "en"
+          ? "Class"
+          : "Lớp học",
+      keyword: `${cls.name || ""} ${cls.gradeLevel || ""} ${cls.academicYear || ""}`,
+      to: `/classes/${cls.id}`,
+    }));
+
+    return [...routeCandidates, ...courseCandidates, ...classCandidates];
+  }, [
+    language,
+    searchCatalog.classes,
+    searchCatalog.courses,
+    searchableRoutes,
+  ]);
+
+  const searchSuggestions = useMemo(() => {
+    const keyword = normalizeText(searchTerm);
+    if (!keyword) return [];
+
+    return searchCandidates
+      .filter((item) => normalizeText(item.keyword).includes(keyword))
+      .slice(0, 8);
+  }, [searchCandidates, searchTerm]);
+
+  const handleSelectSearchSuggestion = (item) => {
+    navigate(item.to);
+    setSearchTerm("");
+    setShowSearchSuggestions(false);
     setMobileOpen(false);
   };
 
   const handleNotificationsClick = () => {
+    setShowSettings(false);
     if (user?.role === "admin") {
       setShowNotifications((prev) => !prev);
       return;
@@ -207,6 +451,11 @@ export default function Layout() {
   const handleNotificationItemClick = () => {
     setShowNotifications(false);
     setMobileOpen(false);
+  };
+
+  const handleSettingsClick = () => {
+    setShowNotifications(false);
+    setShowSettings((prev) => !prev);
   };
 
   const handleOpenNotification = async (item) => {
@@ -278,25 +527,12 @@ export default function Layout() {
                   EduLMS
                 </span>
                 <span className="block text-xs text-slate-500">
-                  Nền tảng học tập số
+                  {t.appSubtitle}
                 </span>
               </div>
             </div>
           )}
           <div className="flex items-center gap-2">
-            <button
-              onClick={toggleTheme}
-              aria-label={
-                theme === "dark" ? "Chuyển sang sáng" : "Chuyển sang tối"
-              }
-              className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-            >
-              {theme === "dark" ? (
-                <SunIcon className="w-5 h-5" />
-              ) : (
-                <MoonIcon className="w-5 h-5" />
-              )}
-            </button>
             <button
               onClick={() => setCollapsed(!collapsed)}
               className="rounded-xl border border-slate-200 bg-white p-2 text-slate-500 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
@@ -356,7 +592,7 @@ export default function Layout() {
                 <span
                   className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${ROLE_COLORS[user?.role]}`}
                 >
-                  {ROLE_LABELS[user?.role]}
+                  {roleLabels[user?.role]}
                 </span>
               </div>
             )}
@@ -366,7 +602,7 @@ export default function Layout() {
             className="mt-1 flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-sm text-red-600 transition-all hover:bg-red-50"
           >
             <ArrowRightOnRectangleIcon className="h-5 w-5 flex-shrink-0" />
-            {!collapsed && <span>Đăng xuất</span>}
+            {!collapsed && <span>{t.logout}</span>}
           </button>
         </div>
       </aside>
@@ -384,19 +620,58 @@ export default function Layout() {
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={toggleTheme}
-                  aria-label={
-                    theme === "dark" ? "Chuyển sang sáng" : "Chuyển sang tối"
-                  }
-                  className="rounded-xl p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800"
-                >
-                  {theme === "dark" ? (
-                    <SunIcon className="h-5 w-5 text-slate-200" />
-                  ) : (
-                    <MoonIcon className="h-5 w-5 text-slate-600" />
+                <div className="relative" ref={mobileSettingsPanelRef}>
+                  <button
+                    onClick={handleSettingsClick}
+                    className="rounded-xl p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    aria-label={t.settings}
+                  >
+                    <Cog6ToothIcon className="h-5 w-5 text-slate-600 dark:text-slate-200" />
+                  </button>
+                  {showSettings && (
+                    <div className="absolute right-0 top-full z-40 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        {t.language}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setLanguage("vi")}
+                        className="mb-1 flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                      >
+                        <span>{t.vietnamese}</span>
+                        {language === "vi" && (
+                          <CheckIcon className="h-4 w-4 text-blue-600" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLanguage("en")}
+                        className="mb-3 flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                      >
+                        <span>{t.english}</span>
+                        {language === "en" && (
+                          <CheckIcon className="h-4 w-4 text-blue-600" />
+                        )}
+                      </button>
+
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        {t.appearance}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={toggleTheme}
+                        className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                      >
+                        <span>{theme === "dark" ? t.dark : t.light}</span>
+                        {theme === "dark" ? (
+                          <MoonIcon className="h-4 w-4" />
+                        ) : (
+                          <SunIcon className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
                   )}
-                </button>
+                </div>
                 <button
                   onClick={() => {
                     if (user?.role === "admin") {
@@ -441,19 +716,48 @@ export default function Layout() {
 
             <form onSubmit={handleSearchSubmit} className="mt-3">
               <label className="sr-only" htmlFor="mobile-search">
-                Tìm kiếm
+                {t.search}
               </label>
               <div className="relative">
                 <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   id="mobile-search"
                   type="text"
-                  placeholder="Tìm nhanh trang..."
+                  placeholder={t.mobileSearchPlaceholder}
                   value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
+                  onFocus={() => setShowSearchSuggestions(true)}
+                  onChange={(event) => {
+                    setSearchTerm(event.target.value);
+                    setShowSearchSuggestions(true);
+                  }}
                   className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 />
               </div>
+              {showSearchSuggestions && searchTerm.trim() && (
+                <div className="mt-2 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                  {searchSuggestions.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-slate-400">
+                      {searchLoading ? t.loadingSearch : t.noSearchResult}
+                    </div>
+                  ) : (
+                    searchSuggestions.map((item) => (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => handleSelectSearchSuggestion(item)}
+                        className="block w-full rounded-lg px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                      >
+                        <p className="text-sm font-medium text-slate-700 dark:text-slate-100">
+                          {item.title}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {item.description}
+                        </p>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </form>
           </header>
         )}
@@ -479,7 +783,7 @@ export default function Layout() {
                     <span
                       className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${ROLE_COLORS[user?.role]}`}
                     >
-                      {ROLE_LABELS[user?.role]}
+                      {roleLabels[user?.role]}
                     </span>
                   </div>
                 </div>
@@ -515,7 +819,7 @@ export default function Layout() {
                       </span>
                     </div>
                   )}
-                  label="Hồ sơ"
+                  label={t.profile}
                   onClick={() => setMobileOpen(false)}
                 />
                 <button
@@ -523,7 +827,7 @@ export default function Layout() {
                   className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
                 >
                   <ArrowRightOnRectangleIcon className="h-5 w-5" />
-                  Đăng xuất
+                  {t.logout}
                 </button>
               </div>
             </div>
@@ -532,109 +836,201 @@ export default function Layout() {
 
         {!isQuizRoute && (
           <header className="hidden md:flex sticky top-0 z-20 items-center justify-between gap-4 border-b border-slate-200/70 bg-white/90 px-6 py-3 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/90">
-            <form onSubmit={handleSearchSubmit} className="w-full max-w-xl">
+            <form
+              onSubmit={handleSearchSubmit}
+              className="relative w-full max-w-xl"
+              ref={searchPanelRef}
+            >
               <label className="sr-only" htmlFor="desktop-search">
-                Tìm kiếm
+                {t.search}
               </label>
               <div className="relative">
                 <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                 <input
                   id="desktop-search"
                   type="text"
-                  placeholder="Tìm trang: bảng điều khiển, môn học, thông báo..."
+                  placeholder={t.searchPlaceholder}
                   value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
+                  onFocus={() => setShowSearchSuggestions(true)}
+                  onChange={(event) => {
+                    setSearchTerm(event.target.value);
+                    setShowSearchSuggestions(true);
+                  }}
                   className="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-700 shadow-sm outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                 />
               </div>
-            </form>
-
-            <div className="flex items-center gap-2" ref={notificationPanelRef}>
-              <button
-                onClick={handleNotificationsClick}
-                className="relative rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                aria-label="Xem thông báo"
-              >
-                <BellIcon className="h-5 w-5" />
-                {unreadCount > 0 && (
-                  <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                    {unreadCount > 99 ? "99+" : unreadCount}
-                  </span>
-                )}
-              </button>
-
-              {user?.role === "admin" && showNotifications && (
-                <div className="absolute right-20 top-full z-30 mt-2 w-96 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-                  <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                      Tất cả thông báo
-                    </p>
-                    <Link
-                      to="/noti"
-                      onClick={handleNotificationItemClick}
-                      className="text-xs font-medium text-blue-600 hover:text-blue-700"
-                    >
-                      Xem trang thông báo
-                    </Link>
-                  </div>
-
-                  <div className="max-h-80 overflow-y-auto p-2">
-                    {notifications.length === 0 ? (
-                      <div className="rounded-xl p-4 text-center text-sm text-slate-400">
-                        Không có thông báo
-                      </div>
-                    ) : (
-                      notifications.map((item) => (
-                        <div
-                          key={item.id}
-                          onClick={() => handleOpenNotification(item)}
-                          className={`group block w-full cursor-pointer rounded-xl px-3 py-2.5 text-left transition-colors ${
-                            item.isRead
-                              ? "hover:bg-slate-50 dark:hover:bg-slate-800"
-                              : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30"
-                          }`}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                              event.preventDefault();
-                              handleOpenNotification(item);
-                            }
-                          }}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0 flex-1">
-                              <p className="line-clamp-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
-                                {item.title}
-                              </p>
-                              {item.message && (
-                                <p className="mt-0.5 line-clamp-2 text-xs text-slate-500 dark:text-slate-300">
-                                  {item.message}
-                                </p>
-                              )}
-                              <p className="mt-1 text-[11px] text-slate-400">
-                                {formatDistanceToNow(new Date(item.createdAt), {
-                                  addSuffix: true,
-                                  locale: vi,
-                                })}
-                              </p>
-                            </div>
-                            <button
-                              onClick={(event) =>
-                                handleDeleteNotification(event, item.id)
-                              }
-                              className="rounded-lg p-1.5 text-slate-400 opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
-                              aria-label="Xóa thông báo"
-                            >
-                              <TrashIcon className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
+              {showSearchSuggestions && searchTerm.trim() && (
+                <div className="absolute mt-2 max-h-72 w-full max-w-xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                  {searchSuggestions.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-slate-400">
+                      {searchLoading ? t.loadingSearch : t.noSearchResult}
+                    </div>
+                  ) : (
+                    searchSuggestions.map((item) => (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => handleSelectSearchSuggestion(item)}
+                        className="block w-full rounded-xl px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                      >
+                        <p className="text-sm font-medium text-slate-700 dark:text-slate-100">
+                          {item.title}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {item.description}
+                        </p>
+                      </button>
+                    ))
+                  )}
                 </div>
               )}
+            </form>
+
+            <div className="flex items-center gap-2">
+              <div className="relative" ref={desktopSettingsPanelRef}>
+                <button
+                  onClick={handleSettingsClick}
+                  className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                  aria-label={t.settings}
+                >
+                  <Cog6ToothIcon className="h-5 w-5" />
+                </button>
+
+                {showSettings && (
+                  <div className="absolute right-0 top-full z-30 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      {t.language}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setLanguage("vi")}
+                      className="mb-1 flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                    >
+                      <span>{t.vietnamese}</span>
+                      {language === "vi" && (
+                        <CheckIcon className="h-4 w-4 text-blue-600" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLanguage("en")}
+                      className="mb-3 flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                    >
+                      <span>{t.english}</span>
+                      {language === "en" && (
+                        <CheckIcon className="h-4 w-4 text-blue-600" />
+                      )}
+                    </button>
+
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      {t.appearance}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={toggleTheme}
+                      className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                    >
+                      <span>{theme === "dark" ? t.dark : t.light}</span>
+                      {theme === "dark" ? (
+                        <MoonIcon className="h-4 w-4" />
+                      ) : (
+                        <SunIcon className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="relative" ref={notificationPanelRef}>
+                <button
+                  onClick={handleNotificationsClick}
+                  className="relative rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                  aria-label="Xem thông báo"
+                >
+                  <BellIcon className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {user?.role === "admin" && showNotifications && (
+                  <div className="absolute right-0 top-full z-30 mt-2 w-96 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+                    <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                        {t.notificationTitle}
+                      </p>
+                      <Link
+                        to="/noti"
+                        onClick={handleNotificationItemClick}
+                        className="text-xs font-medium text-blue-600 hover:text-blue-700"
+                      >
+                        {t.notificationPageLink}
+                      </Link>
+                    </div>
+
+                    <div className="max-h-80 overflow-y-auto p-2">
+                      {notifications.length === 0 ? (
+                        <div className="rounded-xl p-4 text-center text-sm text-slate-400">
+                          {t.noNotifications}
+                        </div>
+                      ) : (
+                        notifications.map((item) => (
+                          <div
+                            key={item.id}
+                            onClick={() => handleOpenNotification(item)}
+                            className={`group block w-full cursor-pointer rounded-xl px-3 py-2.5 text-left transition-colors ${
+                              item.isRead
+                                ? "hover:bg-slate-50 dark:hover:bg-slate-800"
+                                : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30"
+                            }`}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                handleOpenNotification(item);
+                              }
+                            }}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <p className="line-clamp-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                                  {item.title}
+                                </p>
+                                {item.message && (
+                                  <p className="mt-0.5 line-clamp-2 text-xs text-slate-500 dark:text-slate-300">
+                                    {item.message}
+                                  </p>
+                                )}
+                                <p className="mt-1 text-[11px] text-slate-400">
+                                  {formatDistanceToNow(
+                                    new Date(item.createdAt),
+                                    {
+                                      addSuffix: true,
+                                      locale: dateLocale,
+                                    },
+                                  )}
+                                </p>
+                              </div>
+                              <button
+                                onClick={(event) =>
+                                  handleDeleteNotification(event, item.id)
+                                }
+                                className="rounded-lg p-1.5 text-slate-400 opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                                aria-label="Xóa thông báo"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <Link
                 to="/profile"
