@@ -9,11 +9,11 @@ const start = async () => {
   try {
     await getPool(); // verify DB connectivity at boot in long-running mode
     app.listen(PORT, () => {
-      console.log(`🚀 LMS Server running on http://localhost:${PORT}`);
-      console.log(`📚 Environment: ${process.env.NODE_ENV}`);
+      console.log(` LMS Server running on http://localhost:${PORT}`);
+      console.log(` Environment: ${process.env.NODE_ENV}`);
     });
   } catch (err) {
-    console.error("❌ Failed to start server:", err);
+    console.error(" Failed to start server:", err);
     process.exit(1);
   }
 };

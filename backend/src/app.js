@@ -4,27 +4,19 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const path = require("path");
 const rateLimit = require("express-rate-limit");
+const slowDown = require("express-slow-down"); 
 require("dotenv").config();
-
-// Routes
-const authRoutes = require("./routes/auth.routes");
-const userRoutes = require("./routes/user.routes");
-const classRoutes = require("./routes/class.routes");
-const subjectRoutes = require("./routes/subject.routes");
-const courseRoutes = require("./routes/course.routes");
-const lessonRoutes = require("./routes/lesson.routes");
-const assignmentRoutes = require("./routes/assignment.routes");
-const submissionRoutes = require("./routes/submission.routes");
-const announcementRoutes = require("./routes/announcement.routes");
-const notificationRoutes = require("./routes/notification.routes");
-const dashboardRoutes = require("./routes/dashboard.routes");
 
 const app = express();
 
-// Security middleware
+// ======================
+//  SECURITY
+// ======================
 app.use(helmet());
 
-// CORS
+// ======================
+//  CORS (fix sạch hơn)
+// ======================
 const allowedOrigins = [
   process.env.FRONTEND_URLS,
   process.env.FRONTEND_URL,
@@ -32,94 +24,118 @@ const allowedOrigins = [
   "http://192.168.1.9:3000",
 ]
   .filter(Boolean)
-  .flatMap((value) => value.split(","))
-  .map((value) => value.trim())
-  .filter(Boolean);
+  .flatMap((v) => v.split(","))
+  .map((v) => v.trim());
 
 app.use(
   cors({
-    origin: function (origin, callback) {
-      // allow server-to-server, Postman, curl
-      if (!origin) return callback(null, true);
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true); // Postman
 
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
 
+      console.warn(" Blocked by CORS:", origin);
       return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  }),
+  })
 );
 
-// Rate limiting
+// ======================
+//  RATE LIMIT (fix 429)
+// ======================
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200,
+  windowMs: 15 * 60 * 1000,
+  max: 100, 
+  standardHeaders: true,
+  legacyHeaders: false,
   message: { error: "Too many requests, please try again later." },
 });
+
+// CHỐNG SPAM NHANH (burst)
+const speedLimiter = slowDown({
+  windowMs: 15 * 60 * 1000,
+  delayAfter: 20, // sau 20 request bắt đầu delay
+  delayMs: () => 500,
+});
+
+// Áp dụng trước routes
+app.use("/api/", speedLimiter);
 app.use("/api/", limiter);
 
-// Body parsing
+// ======================
+// BODY PARSER
+// ======================
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Logging
+// ======================
+// LOGGING
+// ======================
 if (process.env.NODE_ENV !== "test") {
   app.use(morgan("dev"));
 }
 
-// Static files (note: Vercel filesystem is ephemeral)
+// ======================
+// STATIC
+// ======================
 app.use(
   "/uploads",
   express.static(path.join(__dirname, "../uploads"), {
     setHeaders: (res) => {
       res.setHeader("X-Content-Type-Options", "nosniff");
     },
-  }),
+  })
 );
 
-// API Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/classes", classRoutes);
-app.use("/api/subjects", subjectRoutes);
-app.use("/api/courses", courseRoutes);
-app.use("/api/lessons", lessonRoutes);
-app.use("/api/assignments", assignmentRoutes);
-app.use("/api/submissions", submissionRoutes);
-app.use("/api/announcements", announcementRoutes);
-app.use("/api/notifications", notificationRoutes);
-app.use("/api/dashboard", dashboardRoutes);
+// ======================
+//  ROUTES
+// ======================
+app.use("/api/auth", require("./routes/auth.routes"));
+app.use("/api/users", require("./routes/user.routes"));
+app.use("/api/classes", require("./routes/class.routes"));
+app.use("/api/subjects", require("./routes/subject.routes"));
+app.use("/api/courses", require("./routes/course.routes"));
+app.use("/api/lessons", require("./routes/lesson.routes"));
+app.use("/api/assignments", require("./routes/assignment.routes"));
+app.use("/api/submissions", require("./routes/submission.routes"));
+app.use("/api/announcements", require("./routes/announcement.routes"));
+app.use("/api/notifications", require("./routes/notification.routes"));
+app.use("/api/dashboard", require("./routes/dashboard.routes"));
 
-// Health check
+// ======================
+//  HEALTH CHECK
+// ======================
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+  res.json({ status: "ok", pid: process.pid });
 });
 
+// ======================
+//  ROOT
+// ======================
 app.get("/", (req, res) => {
   res.send("API working");
 });
 
-// 404 handler
+// ======================
+// 404
+// ======================
 app.use((req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
 
-// Global error handler
+// ======================
+// ERROR HANDLER
+// ======================
 app.use((err, req, res, next) => {
   const status = Number.isInteger(err.status) ? err.status : 500;
-  const isServerError = status >= 500;
 
-  if (isServerError) {
-    console.error(err.stack || err);
-  }
+  console.error(" ERROR:", err.message);
 
   res.status(status).json({
-    error: isServerError ? "Internal server error" : err.message,
-    ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
+    error: status >= 500 ? "Internal server error" : err.message,
   });
 });
 

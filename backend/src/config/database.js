@@ -10,8 +10,9 @@ const pool = new Pool({
   connectionString: DATABASE_URL,
   ssl:
     process.env.PG_SSL === "true" ? { rejectUnauthorized: false } : undefined,
-  max: parseInt(process.env.PG_POOL_MAX || "10", 10),
-  idleTimeoutMillis: 30000,
+  max: parseInt(process.env.PG_POOL_MAX || "30", 10),
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
 });
 
 const legacyKeyMap = {
