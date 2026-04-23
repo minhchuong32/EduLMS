@@ -19,6 +19,8 @@ import UsersPage from "./pages/UsersPage";
 import ProfilePage from "./pages/ProfilePage";
 import AnnouncementsPage from "./pages/AnnouncementsPage";
 import GradingPage from "./pages/GradingPage";
+import NotiPage from "./pages/NotiPage";
+import NotiDetailPage from "./pages/NotiDetailPage";
 import Layout from "./components/common/Layout";
 
 const PrivateRoute = ({ children, roles }) => {
@@ -100,8 +102,24 @@ function AppRoutes() {
         <Route
           path="announcements"
           element={
-            <PrivateRoute roles={["admin", "teacher"]}>
+            <PrivateRoute roles={["admin", "teacher", "student"]}>
               <AnnouncementsPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="noti"
+          element={
+            <PrivateRoute roles={["admin"]}>
+              <NotiPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="noti/:id"
+          element={
+            <PrivateRoute roles={["admin"]}>
+              <NotiDetailPage />
             </PrivateRoute>
           }
         />

@@ -9,9 +9,7 @@ if (!DATABASE_URL) {
 const pool = new Pool({
   connectionString: DATABASE_URL,
   ssl:
-    process.env.PG_SSL === "true"
-      ? { rejectUnauthorized: false }
-      : undefined,
+    process.env.PG_SSL === "true" ? { rejectUnauthorized: false } : undefined,
   max: parseInt(process.env.PG_POOL_MAX || "10", 10),
   idleTimeoutMillis: 30000,
 });
@@ -21,6 +19,7 @@ const legacyKeyMap = {
   passwordhash: "passwordHash",
   dateofbirth: "dateOfBirth",
   isactive: "isActive",
+  isread: "isRead",
   createdat: "createdAt",
   updatedat: "updatedAt",
   gradelevel: "gradeLevel",

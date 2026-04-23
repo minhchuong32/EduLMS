@@ -8,6 +8,7 @@ const {
   updateUser,
   deleteUser,
   updateProfile,
+  requestAccountDeletion,
 } = require("../controllers/index.controller");
 const { authenticate, authorize } = require("../middleware/auth.middleware");
 const { upload, setUploadType } = require("../middleware/upload.middleware");
@@ -22,6 +23,7 @@ router.put(
   upload.single("avatar"),
   updateProfile,
 );
+router.post("/profile/delete-request", requestAccountDeletion);
 router.get("/:id", authorize("admin"), getUserById);
 router.put(
   "/:id",

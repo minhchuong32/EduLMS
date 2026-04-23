@@ -86,7 +86,7 @@ export function AnnouncementsPage() {
 
   const canPost = user.role === "admin";
 
-  if (!user || !["admin", "teacher"].includes(user.role)) {
+  if (!user || !["admin", "teacher", "student"].includes(user.role)) {
     return (
       <div className="max-w-3xl mx-auto p-6 text-center text-gray-500">
         Bạn không có quyền truy cập trang này.

@@ -242,6 +242,66 @@ const updateProfile = async (req, res) => {
   return updateUser(req, res);
 };
 
+const requestAccountDeletion = async (req, res) => {
+  try {
+    const requesterResult = await query(
+      "SELECT id, fullName, email, role FROM Users WHERE id = @id AND isActive = true",
+      { id: req.user.id },
+    );
+
+    if (!requesterResult.recordset.length) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const requester = requesterResult.recordset[0];
+    const requesterName = requester.fullName || requester.fullname;
+    const title = "Yêu cầu xóa tài khoản";
+    const message = `Người dùng ${requesterName} (${requester.email}, vai trò: ${requester.role}) vừa gửi yêu cầu xóa tài khoản.`;
+
+    await withTransaction(async (client) => {
+      const created = await query(
+        `
+        INSERT INTO Notifications (userId, title, message, type, referenceId)
+        SELECT id, @title, @message, 'account_delete_request', @referenceId
+        FROM Users
+        WHERE role = 'admin' AND isActive = true
+        RETURNING id
+      `,
+        {
+          title,
+          message,
+          referenceId: requester.id,
+        },
+        client,
+      );
+
+      if (!created.recordset.length) {
+        throw new Error("No active admin found");
+      }
+
+      await query(
+        `
+        INSERT INTO Announcements (courseEnrollmentId, classId, authorId, title, content, isGlobal)
+        VALUES (NULL, NULL, @authorId, @title, @content, true)
+      `,
+        {
+          authorId: requester.id,
+          title,
+          content: message,
+        },
+        client,
+      );
+    });
+
+    res.json({ message: "Deletion request has been sent to admin" });
+  } catch (err) {
+    if (err.message === "No active admin found") {
+      return res.status(404).json({ error: "No active admin found" });
+    }
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
 const teacherHasClassAccess = async (classId, teacherId) => {
   const homeroomColumnExists = await query(
     `
@@ -821,6 +881,7 @@ const getAnnouncements = async (req, res) => {
   try {
     const { courseId, classId } = req.query;
     const { role, id: userId } = req.user;
+    const ACCOUNT_DELETE_REQUEST_TITLE = "Yêu cầu xóa tài khoản";
     const params = {};
     const classColumnExists = await query(
       `
@@ -837,6 +898,11 @@ const getAnnouncements = async (req, res) => {
     }
 
     let where = "WHERE 1=1";
+
+    if (role !== "admin") {
+      where += " AND a.title <> @accountDeleteRequestTitle";
+      params.accountDeleteRequestTitle = ACCOUNT_DELETE_REQUEST_TITLE;
+    }
 
     if (courseId) {
       where += " AND a.courseEnrollmentId = @courseId";
@@ -1165,6 +1231,74 @@ const getNotifications = async (req, res) => {
   }
 };
 
+const getNotificationById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await query(
+      `
+      SELECT *
+      FROM Notifications
+      WHERE id = @id AND userId = @userId
+      LIMIT 1
+    `,
+      { id, userId: req.user.id },
+    );
+
+    if (!result.recordset.length) {
+      return res.status(404).json({ error: "Notification not found" });
+    }
+
+    res.json(result.recordset[0]);
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+const markNotificationRead = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await query(
+      `
+      UPDATE Notifications
+      SET isRead = true
+      WHERE id = @id AND userId = @userId
+      RETURNING *
+    `,
+      { id, userId: req.user.id },
+    );
+
+    if (!result.recordset.length) {
+      return res.status(404).json({ error: "Notification not found" });
+    }
+
+    res.json(result.recordset[0]);
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+const deleteNotification = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await query(
+      `
+      DELETE FROM Notifications
+      WHERE id = @id AND userId = @userId
+      RETURNING id
+    `,
+      { id, userId: req.user.id },
+    );
+
+    if (!result.recordset.length) {
+      return res.status(404).json({ error: "Notification not found" });
+    }
+
+    res.json({ message: "Notification deleted" });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
 const markRead = async (req, res) => {
   try {
     await query("UPDATE Notifications SET isRead = 1 WHERE userId = @userId", {
@@ -1258,6 +1392,7 @@ module.exports = {
   updateUser,
   deleteUser,
   updateProfile,
+  requestAccountDeletion,
   // Classes
   getClasses,
   getClassById,
@@ -1283,7 +1418,10 @@ module.exports = {
   deleteAnnouncement,
   // Notifications
   getNotifications,
+  getNotificationById,
+  markNotificationRead,
   markRead,
+  deleteNotification,
   // Dashboard
   getDashboard,
 };

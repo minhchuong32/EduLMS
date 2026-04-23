@@ -86,6 +86,7 @@ export const userApi = {
   create: (data) => api.post("/users", data),
   update: (id, data) => api.put(`/users/${id}`, data),
   delete: (id) => api.delete(`/users/${id}`),
+  requestDeleteAccount: () => api.post("/users/profile/delete-request"),
   updateProfile: (data) => {
     const formData = new FormData();
     Object.entries(data).forEach(
@@ -210,7 +211,10 @@ export const announcementApi = {
 // Notifications
 export const notificationApi = {
   getAll: () => api.get("/notifications"),
+  getById: (id) => api.get(`/notifications/${id}`),
+  markRead: (id) => api.put(`/notifications/${id}/read`),
   markAllRead: () => api.put("/notifications/read-all"),
+  delete: (id) => api.delete(`/notifications/${id}`),
 };
 
 // Dashboard
