@@ -8,6 +8,7 @@ import React, {
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import {
+  QuestionMarkCircleIcon,
   HomeIcon,
   BookOpenIcon,
   AcademicCapIcon,
@@ -119,7 +120,7 @@ const UI_TEXT = {
     notificationTitle: "Tất cả thông báo",
     notificationPageLink: "Xem trang thông báo",
     noNotifications: "Không có thông báo",
-    settings: "Cài đặt",
+    support: "Hỗ trợ",
     language: "Ngôn ngữ",
     appearance: "Giao diện",
     vietnamese: "Tiếng Việt",
@@ -140,7 +141,7 @@ const UI_TEXT = {
     notificationTitle: "All notifications",
     notificationPageLink: "Open notifications page",
     noNotifications: "No notifications",
-    settings: "Settings",
+    support: "Support",
     language: "Language",
     appearance: "Appearance",
     vietnamese: "Tiếng Việt",
@@ -158,6 +159,8 @@ const ROLE_COLORS = {
 };
 
 export default function Layout() {
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef(null);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -189,6 +192,18 @@ export default function Layout() {
   const t = UI_TEXT[language];
   const roleLabels = ROLE_LABELS[language];
   const dateLocale = language === "en" ? enUS : vi;
+  useEffect(() => {
+    if (!showUserMenu) return;
+
+    const handleClickOutside = (e) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
+        setShowUserMenu(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showUserMenu]);
 
   useEffect(() => {
     localStorage.setItem("layoutLang", language);
@@ -566,43 +581,14 @@ export default function Layout() {
           })}
         </nav>
 
-        <div className="border-t border-slate-100/80 p-3 dark:border-slate-800/80">
-          <Link
-            to="/profile"
-            className="flex items-center gap-3 rounded-2xl p-2 hover:bg-slate-50"
-          >
-            {user?.avatar ? (
-              <img
-                src={`${FILE_BASE_URL}${user.avatar}`}
-                alt="avatar"
-                className="h-9 w-9 flex-shrink-0 rounded-full object-cover"
-              />
-            ) : (
-              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 shadow-sm">
-                <span className="text-xs font-bold text-white">
-                  {user?.fullName?.[0]}
-                </span>
-              </div>
-            )}
-            {!collapsed && (
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-slate-800">
-                  {user?.fullName}
-                </p>
-                <span
-                  className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${ROLE_COLORS[user?.role]}`}
-                >
-                  {roleLabels[user?.role]}
-                </span>
-              </div>
-            )}
-          </Link>
+        <div className="border-t border-slate-100/80 p-3 space-y-1 dark:border-slate-800/80">
+          {/* SUPPORT */}
           <button
-            onClick={handleLogout}
-            className="mt-1 flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-sm text-red-600 transition-all hover:bg-red-50"
+            onClick={() => navigate("/support")} // hoặc mở modal
+            className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-sm text-slate-600 hover:bg-slate-50"
           >
-            <ArrowRightOnRectangleIcon className="h-5 w-5 flex-shrink-0" />
-            {!collapsed && <span>{t.logout}</span>}
+            <QuestionMarkCircleIcon className="h-5 w-5" />
+            {!collapsed && <span>{t.support}</span>}
           </button>
         </div>
       </aside>
@@ -887,10 +873,11 @@ export default function Layout() {
             </form>
 
             <div className="flex items-center gap-2">
+              {/* Setting  */}
               <div className="relative" ref={desktopSettingsPanelRef}>
                 <button
                   onClick={handleSettingsClick}
-                  className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                  className="rounded-xl bg-white p-2.5 text-slate-600 shadow-sm hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                   aria-label={t.settings}
                 >
                   <Cog6ToothIcon className="h-5 w-5" />
@@ -940,11 +927,11 @@ export default function Layout() {
                   </div>
                 )}
               </div>
-
+              {/* Noti  */}
               <div className="relative" ref={notificationPanelRef}>
                 <button
                   onClick={handleNotificationsClick}
-                  className="relative rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                  className="relative rounded-xl bg-white p-2.5 text-slate-600 shadow-sm hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                   aria-label="Xem thông báo"
                 >
                   <BellIcon className="h-5 w-5" />
@@ -1031,28 +1018,48 @@ export default function Layout() {
                   </div>
                 )}
               </div>
+              {/* Avatar  */}
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  onClick={() => setShowUserMenu((prev) => !prev)}
+                  className="flex items-center justify-center rounded-full"
+                >
+                  {user?.avatar ? (
+                    <img
+                      src={`${FILE_BASE_URL}${user.avatar}`}
+                      alt="avatar"
+                      className="h-8 w-8 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-600">
+                      <span className="text-xs font-bold text-white">
+                        {user?.fullName?.[0]}
+                      </span>
+                    </div>
+                  )}
+                </button>
 
-              <Link
-                to="/profile"
-                className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white p-1.5 pr-3 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
-              >
-                {user?.avatar ? (
-                  <img
-                    src={`${FILE_BASE_URL}${user.avatar}`}
-                    alt="avatar"
-                    className="h-8 w-8 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-600">
-                    <span className="text-xs font-bold text-white">
-                      {user?.fullName?.[0]}
-                    </span>
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-44 overflow-hidden rounded-2xl border bg-white shadow-xl dark:bg-slate-800">
+                    <button
+                      onClick={() => {
+                        navigate("/profile");
+                        setShowUserMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm rounded-t-2xl hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                      {t.profile}
+                    </button>
+
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left px-4 py-2 text-sm text-red-600 rounded-b-2xl hover:bg-red-50"
+                    >
+                      {t.logout}
+                    </button>
                   </div>
                 )}
-                <span className="max-w-28 truncate text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {user?.fullName}
-                </span>
-              </Link>
+              </div>
             </div>
           </header>
         )}
