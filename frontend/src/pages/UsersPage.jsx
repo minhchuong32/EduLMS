@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { userApi } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
@@ -10,6 +10,13 @@ import {
   TrashIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  UserGroupIcon,
+  ShieldCheckIcon,
+  AcademicCapIcon,
+  UserIcon,
+  FunnelIcon,
+  CheckBadgeIcon,
+  LockClosedIcon,
 } from "@heroicons/react/24/outline";
 
 const ROLE_LABELS = {
@@ -18,9 +25,9 @@ const ROLE_LABELS = {
   student: "Học sinh",
 };
 const ROLE_COLORS = {
-  admin: "bg-purple-100 text-purple-700",
+  admin: "bg-slate-100 text-slate-700",
   teacher: "bg-blue-100 text-blue-700",
-  student: "bg-green-100 text-green-700",
+  student: "bg-emerald-100 text-emerald-700",
 };
 
 const emptyCreateForm = {
@@ -30,6 +37,20 @@ const emptyCreateForm = {
   password: "School@123",
 };
 const PAGE_SIZE = 7;
+
+const roleOptions = [
+  { value: "", label: "Tất cả vai trò" },
+  { value: "admin", label: "Quản trị" },
+  { value: "teacher", label: "Giáo viên" },
+  { value: "student", label: "Học sinh" },
+];
+
+const formatDate = (value) => {
+  if (!value) return "-";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "-";
+  return parsed.toLocaleDateString("vi-VN");
+};
 
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
@@ -176,291 +197,458 @@ export default function UsersPage() {
   const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const rangeEnd = (page - 1) * PAGE_SIZE + users.length;
 
+  const pageStats = useMemo(() => {
+    const active = users.filter((u) => u.isActive).length;
+    const locked = users.length - active;
+    const admins = users.filter((u) => u.role === "admin").length;
+    const teachers = users.filter((u) => u.role === "teacher").length;
+    const students = users.filter((u) => u.role === "student").length;
+
+    return { active, locked, admins, teachers, students };
+  }, [users]);
+
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">
-            Người dùng
-          </h1>
-          <p className="text-gray-500 text-sm">
-            {total} tài khoản
-            {total > 0 && (
-              <span className="text-gray-400">
-                {" "}
-                · Trang {page}/{totalPages}
-              </span>
-            )}
-          </p>
-        </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-1.5 bg-blue-600 text-white px-3 md:px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700"
-        >
-          <PlusIcon className="w-4 h-4" />
-          <span className="hidden sm:inline">Tạo tài khoản</span>
-          <span className="sm:hidden">Tạo</span>
-        </button>
-      </div>
+    <div className="mx-auto max-w-[1600px] px-4 pb-8 pt-2 md:px-6">
+      <section className="hero-card mb-5 overflow-hidden p-5 md:p-7">
+        <div className="relative z-10 grid gap-5 lg:grid-cols-[1fr_auto] lg:items-end">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/85">
+              <ShieldCheckIcon className="h-4 w-4" />
+              Admin Console
+            </div>
+            <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-white md:text-4xl">
+              Quản lý người dùng
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/75 md:text-base">
+              Kiểm soát tài khoản hệ thống, phân quyền nhanh và theo dõi trạng
+              thái hoạt động theo thời gian thực.
+            </p>
+          </div>
 
-      {/* Filters */}
-      <div className="flex gap-2 mb-4">
-        <div className="flex-1 relative">
-          <MagnifyingGlassIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Tìm tên, email..."
-            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-white/65">
+                Tổng tài khoản
+              </p>
+              <p className="mt-1 text-xl font-bold text-white">{total}</p>
+            </div>
+            <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-white/65">
+                Đang hoạt động
+              </p>
+              <p className="mt-1 text-xl font-bold text-white">
+                {pageStats.active}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-white/65">
+                Giáo viên
+              </p>
+              <p className="mt-1 text-xl font-bold text-white">
+                {pageStats.teachers}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-white/65">
+                Học sinh
+              </p>
+              <p className="mt-1 text-xl font-bold text-white">
+                {pageStats.students}
+              </p>
+            </div>
+          </div>
         </div>
-        <select
-          value={role}
-          onChange={(e) => {
-            setRole(e.target.value);
-            setPage(1);
-          }}
-          className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 flex-shrink-0"
-        >
-          <option value="">Tất cả</option>
-          <option value="admin">Quản trị</option>
-          <option value="teacher">Giáo viên</option>
-          <option value="student">Học sinh</option>
-        </select>
-      </div>
+      </section>
 
-      <>
-        <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                {[
-                  "Họ tên",
-                  "Email",
-                  "Vai trò",
-                  "Trạng thái",
-                  "Ngày tạo",
-                  "Thao tác",
-                ].map((h) => (
-                  <th
-                    key={h}
-                    className="text-left text-xs font-medium text-gray-500 uppercase px-5 py-3"
+      <main className="grid grid-cols-12 gap-5">
+        <section className="col-span-12 space-y-4 lg:col-span-9">
+          <div className="panel-card p-4 md:p-5">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="relative w-full md:max-w-xl">
+                <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                  placeholder="Tìm theo họ tên hoặc email..."
+                  className="soft-input pl-9"
+                />
+              </div>
+
+              <div className="flex w-full items-center gap-2 md:w-auto">
+                <div className="relative w-full md:w-56">
+                  <FunnelIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <select
+                    value={role}
+                    onChange={(e) => {
+                      setRole(e.target.value);
+                      setPage(1);
+                    }}
+                    className="soft-select pl-9"
                   >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
+                    {roleOptions.map((option) => (
+                      <option key={option.value || "all"} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowModal(true)}
+                  className="soft-button-primary whitespace-nowrap"
+                >
+                  <PlusIcon className="h-4 w-4" />
+                  Tạo tài khoản
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="panel-card overflow-hidden">
+            <div className="border-b border-slate-200/70 px-5 py-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-extrabold tracking-tight text-slate-900 md:text-lg">
+                    Danh sách tài khoản
+                  </h2>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Hiển thị {rangeStart}-{rangeEnd} trên tổng {total} tài khoản
+                  </p>
+                </div>
+                <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                  Trang {page}/{totalPages}
+                </div>
+              </div>
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[860px]">
+                <thead className="bg-surface-container-low border-b border-slate-200/70">
+                  <tr>
+                    {[
+                      "Tên",
+                      "Email",
+                      "Vai trò",
+                      "Trạng thái",
+                      "Ngày tạo",
+                      "Thao tác",
+                    ].map((header) => (
+                      <th
+                        key={header}
+                        className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.13em] text-slate-500"
+                      >
+                        {header}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {users.map((u) => (
+                    <tr
+                      key={u.id}
+                      className="bg-white/70 transition-colors hover:bg-blue-50/40"
+                    >
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">
+                            {u.fullName?.[0] || "?"}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-slate-800">
+                              {u.fullName}
+                            </p>
+                            <p className="text-xs text-slate-400">
+                              ID: {u.id?.slice?.(0, 8) || "-"}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 text-sm text-slate-600">
+                        {u.email}
+                      </td>
+                      <td className="px-5 py-3">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${ROLE_COLORS[u.role]}`}
+                        >
+                          {ROLE_LABELS[u.role]}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3">
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${u.isActive ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}
+                        >
+                          {u.isActive ? (
+                            <CheckBadgeIcon className="h-3.5 w-3.5" />
+                          ) : (
+                            <LockClosedIcon className="h-3.5 w-3.5" />
+                          )}
+                          {u.isActive ? "Hoạt động" : "Bị khóa"}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-xs text-slate-500">
+                        {formatDate(u.createdAt)}
+                      </td>
+                      <td className="px-5 py-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleActive(u.id, u.isActive)}
+                            className={`rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition-colors ${u.isActive ? "border-rose-200 text-rose-700 hover:bg-rose-50" : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"}`}
+                          >
+                            {u.isActive ? "Khóa" : "Kích hoạt"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openEdit(u.id)}
+                            className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                          >
+                            <PencilSquareIcon className="h-3.5 w-3.5" />
+                            Sửa
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isSelf(u.id)}
+                            onClick={() => setDeleteTarget(u)}
+                            className="inline-flex items-center gap-1 rounded-xl border border-rose-200 px-2.5 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-50 disabled:pointer-events-none disabled:opacity-40"
+                          >
+                            <TrashIcon className="h-3.5 w-3.5" />
+                            Xóa
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="space-y-2 p-4 md:hidden">
               {users.map((u) => (
-                <tr key={u.id} className="hover:bg-gray-50">
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 text-xs font-bold">
-                        {u.fullName?.[0] || "?"}
-                      </div>
-                      <span className="text-sm font-medium text-gray-800">
-                        {u.fullName}
-                      </span>
+                <div key={u.id} className="section-card p-3">
+                  <div className="mb-3 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+                      {u.fullName?.[0] || "?"}
                     </div>
-                  </td>
-                  <td className="px-5 py-3 text-sm text-gray-500">{u.email}</td>
-                  <td className="px-5 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-800">
+                        {u.fullName}
+                      </p>
+                      <p className="truncate text-xs text-slate-500">
+                        {u.email}
+                      </p>
+                    </div>
                     <span
-                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${ROLE_COLORS[u.role]}`}
+                      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${ROLE_COLORS[u.role]}`}
                     >
                       {ROLE_LABELS[u.role]}
                     </span>
-                  </td>
-                  <td className="px-5 py-3">
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${u.isActive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}
-                    >
-                      {u.isActive ? "Hoạt động" : "Bị khóa"}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-xs text-gray-400">
-                    {new Date(u.createdAt).toLocaleDateString("vi-VN")}
-                  </td>
-                  <td className="px-5 py-3">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => toggleActive(u.id, u.isActive)}
-                        className={`text-xs px-2.5 py-1.5 rounded-lg border font-medium transition-colors
-                        ${u.isActive ? "border-red-200 text-red-600 hover:bg-red-50" : "border-green-200 text-green-600 hover:bg-green-50"}`}
-                      >
-                        {u.isActive ? "Khóa" : "Kích hoạt"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openEdit(u.id)}
-                        className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 font-medium inline-flex items-center gap-1"
-                      >
-                        <PencilSquareIcon className="w-3.5 h-3.5" />
-                        Sửa
-                      </button>
-                      <button
-                        type="button"
-                        disabled={isSelf(u.id)}
-                        onClick={() => setDeleteTarget(u)}
-                        className="text-xs px-2.5 py-1.5 rounded-lg border border-red-100 text-red-600 hover:bg-red-50 font-medium inline-flex items-center gap-1 disabled:opacity-40 disabled:pointer-events-none"
-                      >
-                        <TrashIcon className="w-3.5 h-3.5" />
-                        Xóa
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {loading && (
-            <div className="text-center py-8 text-gray-400 text-sm">
-              Đang tải...
-            </div>
-          )}
-          {!loading && users.length === 0 && (
-            <div className="text-center py-8 text-gray-400 text-sm">
-              Không tìm thấy người dùng
-            </div>
-          )}
-        </div>
+                  </div>
 
-        <div className="md:hidden space-y-2">
-          {loading && (
-            <div className="text-center py-8 text-gray-400 text-sm">
-              Đang tải...
-            </div>
-          )}
-          {!loading && users.length === 0 && (
-            <div className="text-center py-10 bg-white rounded-2xl border border-gray-100 text-gray-400 text-sm">
-              Không tìm thấy người dùng
-            </div>
-          )}
-          {users.map((u) => (
-            <div
-              key={u.id}
-              className="bg-white rounded-2xl border border-gray-100 p-4"
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold flex-shrink-0">
-                  {u.fullName?.[0] || "?"}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-800 text-sm truncate">
-                    {u.fullName}
-                  </p>
-                  <p className="text-xs text-gray-400 truncate">{u.email}</p>
-                </div>
-                <span
-                  className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${ROLE_COLORS[u.role]}`}
-                >
-                  {ROLE_LABELS[u.role]}
-                </span>
-              </div>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                  <div className="mb-3 flex items-center justify-between text-xs">
                     <span
-                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${u.isActive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}
+                      className={`${u.isActive ? "text-emerald-700" : "text-rose-700"}`}
                     >
                       {u.isActive ? "Hoạt động" : "Bị khóa"}
                     </span>
-                    <span className="text-xs text-gray-400">
-                      {new Date(u.createdAt).toLocaleDateString("vi-VN")}
+                    <span className="text-slate-500">
+                      {formatDate(u.createdAt)}
                     </span>
                   </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleActive(u.id, u.isActive)}
+                      className={`rounded-xl border px-2 py-2 text-xs font-semibold ${u.isActive ? "border-rose-200 text-rose-700" : "border-emerald-200 text-emerald-700"}`}
+                    >
+                      {u.isActive ? "Khóa" : "Kích hoạt"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openEdit(u.id)}
+                      className="rounded-xl border border-slate-200 px-2 py-2 text-xs font-semibold text-slate-700"
+                    >
+                      Sửa
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSelf(u.id)}
+                      onClick={() => setDeleteTarget(u)}
+                      className="rounded-xl border border-rose-200 px-2 py-2 text-xs font-semibold text-rose-700 disabled:pointer-events-none disabled:opacity-40"
+                    >
+                      Xóa
+                    </button>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
+              ))}
+            </div>
+
+            {loading && (
+              <div className="px-5 py-8 text-center text-sm text-slate-500">
+                Đang tải dữ liệu...
+              </div>
+            )}
+
+            {!loading && users.length === 0 && (
+              <div className="px-5 py-10 text-center text-sm text-slate-500">
+                Không tìm thấy người dùng phù hợp bộ lọc hiện tại.
+              </div>
+            )}
+
+            {!loading && total > 0 && (
+              <div className="flex flex-col gap-3 border-t border-slate-200/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-slate-500">
+                  Hiển thị{" "}
+                  <span className="font-semibold text-slate-700">
+                    {rangeStart}
+                  </span>
+                  -
+                  <span className="font-semibold text-slate-700">
+                    {rangeEnd}
+                  </span>{" "}
+                  trên{" "}
+                  <span className="font-semibold text-slate-700">{total}</span>
+                </p>
+                <div className="flex items-center justify-center gap-2 sm:justify-end">
                   <button
                     type="button"
-                    onClick={() => toggleActive(u.id, u.isActive)}
-                    className={`text-xs px-3 py-1.5 rounded-lg border font-medium flex-1 min-w-[5rem]
-                    ${u.isActive ? "border-red-200 text-red-600" : "border-green-200 text-green-600"}`}
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40"
                   >
-                    {u.isActive ? "Khóa" : "Kích hoạt"}
+                    <ChevronLeftIcon className="h-4 w-4" />
+                    Trước
                   </button>
+                  <span className="px-2 text-sm font-semibold text-slate-600">
+                    {page} / {totalPages}
+                  </span>
                   <button
                     type="button"
-                    onClick={() => openEdit(u.id)}
-                    className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 font-medium flex-1 min-w-[5rem]"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40"
                   >
-                    Sửa
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isSelf(u.id)}
-                    onClick={() => setDeleteTarget(u)}
-                    className="text-xs px-3 py-1.5 rounded-lg border border-red-100 text-red-600 font-medium flex-1 min-w-[5rem] disabled:opacity-40 disabled:pointer-events-none"
-                  >
-                    Xóa
+                    Sau
+                    <ChevronRightIcon className="h-4 w-4" />
                   </button>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-
-        {!loading && total > 0 && (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4 px-1">
-            <p className="text-sm text-gray-500">
-              Hiển thị{" "}
-              <span className="font-medium text-gray-700">{rangeStart}</span>–
-              <span className="font-medium text-gray-700">{rangeEnd}</span>
-              {" / "}
-              <span className="font-medium text-gray-700">{total}</span>
-            </p>
-            <div className="flex items-center justify-center sm:justify-end gap-2">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:pointer-events-none"
-              >
-                <ChevronLeftIcon className="w-4 h-4" />
-                Trước
-              </button>
-              <span className="text-sm text-gray-600 tabular-nums px-2">
-                {page} / {totalPages}
-              </span>
-              <button
-                type="button"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:pointer-events-none"
-              >
-                Sau
-                <ChevronRightIcon className="w-4 h-4" />
-              </button>
-            </div>
+            )}
           </div>
-        )}
-      </>
+        </section>
+
+        <aside className="col-span-12 flex flex-col gap-4 lg:col-span-3">
+          <section className="panel-card p-4">
+            <h3 className="text-xs font-bold uppercase tracking-[0.13em] text-slate-500">
+              Phân bổ vai trò (trang hiện tại)
+            </h3>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <div className="rounded-xl bg-slate-100 p-3 text-center">
+                <p className="text-[11px] font-semibold uppercase text-slate-500">
+                  Admin
+                </p>
+                <p className="mt-1 text-lg font-bold text-slate-800">
+                  {pageStats.admins}
+                </p>
+              </div>
+              <div className="rounded-xl bg-blue-50 p-3 text-center">
+                <p className="text-[11px] font-semibold uppercase text-blue-500">
+                  Teacher
+                </p>
+                <p className="mt-1 text-lg font-bold text-blue-700">
+                  {pageStats.teachers}
+                </p>
+              </div>
+              <div className="rounded-xl bg-emerald-50 p-3 text-center">
+                <p className="text-[11px] font-semibold uppercase text-emerald-500">
+                  Student
+                </p>
+                <p className="mt-1 text-lg font-bold text-emerald-700">
+                  {pageStats.students}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="h-full bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-500"
+                style={{
+                  width: `${total > 0 ? Math.max(8, Math.round((users.length / total) * 100)) : 8}%`,
+                }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              Mức hiển thị dữ liệu:{" "}
+              {total > 0 ? Math.round((users.length / total) * 100) : 0}%
+            </p>
+          </section>
+
+          <section className="panel-card p-4">
+            <h3 className="text-xs font-bold uppercase tracking-[0.13em] text-slate-500">
+              Trạng thái hệ thống
+            </h3>
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2">
+                <div className="flex items-center gap-2 text-emerald-700">
+                  <UserGroupIcon className="h-4 w-4" />
+                  <span className="text-xs font-semibold">Đang hoạt động</span>
+                </div>
+                <span className="text-sm font-bold text-emerald-700">
+                  {pageStats.active}
+                </span>
+              </div>
+              <div className="flex items-center justify-between rounded-xl bg-rose-50 px-3 py-2">
+                <div className="flex items-center gap-2 text-rose-700">
+                  <LockClosedIcon className="h-4 w-4" />
+                  <span className="text-xs font-semibold">Bị khóa</span>
+                </div>
+                <span className="text-sm font-bold text-rose-700">
+                  {pageStats.locked}
+                </span>
+              </div>
+            </div>
+          </section>
+
+          <section className="panel-card p-4">
+            <h3 className="text-xs font-bold uppercase tracking-[0.13em] text-slate-500">
+              Hướng dẫn nhanh
+            </h3>
+            <ul className="mt-3 space-y-2 text-sm text-slate-600">
+              <li className="flex items-start gap-2 rounded-xl bg-slate-50 px-3 py-2">
+                <AcademicCapIcon className="mt-0.5 h-4 w-4 text-blue-600" />
+                Ưu tiên tài khoản giáo viên có email trường để dễ quản trị lớp.
+              </li>
+              <li className="flex items-start gap-2 rounded-xl bg-slate-50 px-3 py-2">
+                <UserIcon className="mt-0.5 h-4 w-4 text-emerald-600" />
+                Dùng tìm kiếm + lọc vai trò trước khi chỉnh sửa hàng loạt.
+              </li>
+            </ul>
+          </section>
+        </aside>
+      </main>
 
       {/* Modal tạo tài khoản */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md p-5">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+          <div className="w-full rounded-t-2xl border border-slate-200 bg-white p-5 shadow-2xl sm:max-w-md sm:rounded-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-bold text-gray-800">
+              <h2 className="text-base font-bold text-slate-800">
                 Tạo tài khoản mới
               </h2>
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="p-1 rounded-lg hover:bg-gray-100"
+                className="rounded-lg p-1 transition-colors hover:bg-slate-100"
               >
-                <XMarkIcon className="w-5 h-5 text-gray-400" />
+                <XMarkIcon className="h-5 w-5 text-slate-400" />
               </button>
             </div>
             <form onSubmit={handleCreate} className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
                   Họ tên *
                 </label>
                 <input
@@ -469,11 +657,11 @@ export default function UsersPage() {
                     setForm({ ...form, fullName: e.target.value })
                   }
                   required
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="soft-input"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
                   Email *
                 </label>
                 <input
@@ -481,18 +669,18 @@ export default function UsersPage() {
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   required
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="soft-input"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
                     Vai trò
                   </label>
                   <select
                     value={form.role}
                     onChange={(e) => setForm({ ...form, role: e.target.value })}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="soft-select"
                   >
                     <option value="student">Học sinh</option>
                     <option value="teacher">Giáo viên</option>
@@ -500,7 +688,7 @@ export default function UsersPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
                     Mật khẩu
                   </label>
                   <input
@@ -509,21 +697,18 @@ export default function UsersPage() {
                     onChange={(e) =>
                       setForm({ ...form, password: e.target.value })
                     }
-                    className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="soft-input"
                   />
                 </div>
               </div>
-              <div className="flex gap-3 pt-1">
-                <button
-                  type="submit"
-                  className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700"
-                >
+              <div className="flex gap-3 pt-1.5">
+                <button type="submit" className="soft-button-primary flex-1">
                   Tạo tài khoản
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="flex-1 py-3 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50"
+                  className="soft-button-secondary flex-1"
                 >
                   Hủy
                 </button>
@@ -535,29 +720,29 @@ export default function UsersPage() {
 
       {/* Modal sửa */}
       {editId && (
-        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md p-5 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+          <div className="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl border border-slate-200 bg-white p-5 shadow-2xl sm:max-w-md sm:rounded-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-bold text-gray-800">
+              <h2 className="text-base font-bold text-slate-800">
                 Chỉnh sửa tài khoản
               </h2>
               <button
                 type="button"
                 onClick={closeEdit}
-                className="p-1 rounded-lg hover:bg-gray-100"
+                className="rounded-lg p-1 transition-colors hover:bg-slate-100"
               >
-                <XMarkIcon className="w-5 h-5 text-gray-400" />
+                <XMarkIcon className="h-5 w-5 text-slate-400" />
               </button>
             </div>
             {editLoading && (
-              <div className="py-12 text-center text-gray-400 text-sm">
+              <div className="py-12 text-center text-sm text-slate-500">
                 Đang tải...
               </div>
             )}
             {!editLoading && editForm && (
               <form onSubmit={handleUpdate} className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
                     Họ tên *
                   </label>
                   <input
@@ -566,11 +751,11 @@ export default function UsersPage() {
                       setEditForm({ ...editForm, fullName: e.target.value })
                     }
                     required
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="soft-input"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
                     Email *
                   </label>
                   <input
@@ -580,11 +765,11 @@ export default function UsersPage() {
                       setEditForm({ ...editForm, email: e.target.value })
                     }
                     required
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="soft-input"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
                     Số điện thoại
                   </label>
                   <input
@@ -592,12 +777,12 @@ export default function UsersPage() {
                     onChange={(e) =>
                       setEditForm({ ...editForm, phone: e.target.value })
                     }
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="soft-input"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    <label className="mb-1.5 block text-sm font-medium text-slate-700">
                       Vai trò
                     </label>
                     <select
@@ -605,7 +790,7 @@ export default function UsersPage() {
                       onChange={(e) =>
                         setEditForm({ ...editForm, role: e.target.value })
                       }
-                      className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="soft-select"
                     >
                       <option value="student">Học sinh</option>
                       <option value="teacher">Giáo viên</option>
@@ -613,7 +798,7 @@ export default function UsersPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    <label className="mb-1.5 block text-sm font-medium text-slate-700">
                       Trạng thái
                     </label>
                     <select
@@ -624,7 +809,7 @@ export default function UsersPage() {
                           isActive: e.target.value === "1",
                         })
                       }
-                      className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="soft-select"
                     >
                       <option value="1">Hoạt động</option>
                       <option value="0">Bị khóa</option>
@@ -632,7 +817,7 @@ export default function UsersPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
                     Mật khẩu mới
                   </label>
                   <input
@@ -643,20 +828,17 @@ export default function UsersPage() {
                     onChange={(e) =>
                       setEditForm({ ...editForm, password: e.target.value })
                     }
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="soft-input"
                   />
                 </div>
-                <div className="flex gap-3 pt-1">
-                  <button
-                    type="submit"
-                    className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700"
-                  >
+                <div className="flex gap-3 pt-1.5">
+                  <button type="submit" className="soft-button-primary flex-1">
                     Lưu thay đổi
                   </button>
                   <button
                     type="button"
                     onClick={closeEdit}
-                    className="flex-1 py-3 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50"
+                    className="soft-button-secondary flex-1"
                   >
                     Hủy
                   </button>
@@ -669,12 +851,12 @@ export default function UsersPage() {
 
       {/* Xác nhận xóa */}
       {deleteTarget && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5">
-            <h3 className="font-bold text-gray-900 mb-2">Xóa tài khoản?</h3>
-            <p className="text-sm text-gray-600 mb-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+            <h3 className="mb-2 font-bold text-slate-900">Xóa tài khoản?</h3>
+            <p className="mb-4 text-sm text-slate-600">
               Xóa vĩnh viễn{" "}
-              <span className="font-medium text-gray-800">
+              <span className="font-medium text-slate-800">
                 {deleteTarget.fullName}
               </span>{" "}
               ({deleteTarget.email}). Thao tác không hoàn tác nếu hệ thống cho
@@ -684,14 +866,14 @@ export default function UsersPage() {
               <button
                 type="button"
                 onClick={() => setDeleteTarget(null)}
-                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="soft-button-secondary flex-1"
               >
                 Hủy
               </button>
               <button
                 type="button"
                 onClick={handleDelete}
-                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700"
+                className="soft-button flex-1 bg-rose-600 text-sm font-semibold text-white hover:bg-rose-700"
               >
                 Xóa
               </button>
