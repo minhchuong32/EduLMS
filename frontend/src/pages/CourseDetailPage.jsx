@@ -9,12 +9,19 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
 import {
+  ArrowLeftIcon,
   PlusIcon,
   PencilIcon,
   TrashIcon,
   LockClosedIcon,
   LockOpenIcon,
   XMarkIcon,
+  BookOpenIcon,
+  PlayCircleIcon,
+  MegaphoneIcon,
+  ClockIcon,
+  CalendarDaysIcon,
+  ArrowTopRightOnSquareIcon,
 } from "@heroicons/react/24/outline";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
@@ -217,6 +224,20 @@ export default function CourseDetailPage() {
     toast.success("Đã cập nhật bài tập");
   };
 
+  const publishedLessonsCount = lessons.filter(
+    (lesson) => lesson.isPublished,
+  ).length;
+  const progressPercent =
+    lessons.length > 0
+      ? Math.round((publishedLessonsCount / lessons.length) * 100)
+      : 0;
+  const featuredLesson =
+    lessons.find((lesson) => lesson.isPublished) || lessons[0];
+  const upcomingDeadlines = assignments
+    .filter((assignment) => assignment.dueDate)
+    .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
+    .slice(0, 3);
+
   if (loading)
     return (
       <div className="flex justify-center items-center h-64">
@@ -231,322 +252,561 @@ export default function CourseDetailPage() {
     );
 
   return (
-    <div className="max-w-5xl mx-auto p-3 md:p-6">
-      {/* Header */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6 mb-4 md:mb-6">
-        <div className="flex items-center gap-2 mb-1 flex-wrap">
-          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
-            {course.subjectCode}
-          </span>
-          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-            {course.className}
-          </span>
-        </div>
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">
-          {course.subjectName}
-        </h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Giáo viên:{" "}
-          <span className="font-medium text-gray-700">
-            {course.teacherName}
-          </span>
-        </p>
-        {course.subjectDescription && (
-          <p className="text-gray-400 text-sm mt-1">
-            {course.subjectDescription}
-          </p>
-        )}
-      </div>
-
-      {/* Tabs */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="flex border-b border-gray-100">
-          {TABS.map((tab, i) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(i)}
-              className={`flex-1 py-3 text-xs md:text-sm font-medium transition-all border-b-2
-                ${activeTab === i ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-blue-50/40 to-indigo-50/30 p-3 md:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto">
+        <header className="mb-8 md:mb-10">
+          <div className="mb-4">
+            <Link
+              to="/courses"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-full border border-slate-200 bg-white/80 text-slate-600 text-sm font-semibold hover:text-blue-700 hover:border-blue-200 hover:bg-white transition-colors"
             >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        <div className="p-3 md:p-6">
-          {/* Tab Bài giảng */}
-          {activeTab === 0 && (
+              <ArrowLeftIcon className="w-4 h-4" />
+              Quay lại khóa học
+            </Link>
+          </div>
+          <nav className="flex items-center gap-2 mb-4 text-xs font-medium text-slate-500">
+            <span>Courses</span>
+            <span>/</span>
+            <span className="text-blue-600">
+              {course.subjectCode || "Chi tiết"}
+            </span>
+          </nav>
+          <div className="flex items-end justify-between gap-6 flex-wrap">
             <div>
-              {isTeacher && (
-                <button
-                  onClick={() => setShowLessonModal(true)}
-                  className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 mb-4 active:bg-blue-800"
-                >
-                  <PlusIcon className="w-4 h-4" /> Thêm bài giảng
-                </button>
-              )}
-              {lessons.length === 0 ? (
-                <p className="text-center text-gray-400 py-10">
-                  Chưa có bài giảng nào
-                </p>
-              ) : (
-                <div className="space-y-2 md:space-y-3">
-                  {lessons.map((lesson, i) => (
-                    <div
-                      key={lesson.id}
-                      className={`flex items-center gap-3 p-3 md:p-4 rounded-xl border
-                        ${lesson.isPublished ? "border-gray-100 bg-gray-50" : "border-dashed border-gray-200 bg-gray-50 opacity-70"}`}
-                    >
-                      <div className="w-7 h-7 md:w-8 md:h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 text-blue-600 font-bold text-xs md:text-sm">
-                        {i + 1}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <Link
-                          to={`/lessons/${lesson.id}`}
-                          className="font-medium text-gray-800 hover:text-blue-600 text-sm block truncate"
-                        >
-                          {lesson.title}
-                        </Link>
-                        {!lesson.isPublished && isTeacher && (
-                          <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full">
-                            Chưa đăng
-                          </span>
-                        )}
-                      </div>
-                      {isTeacher && (
-                        <div className="flex items-center gap-0.5">
-                          <button
-                            onClick={() =>
-                              handlePublishLesson(
-                                lesson.id,
-                                !lesson.isPublished,
-                              )
-                            }
-                            className={`p-2 rounded-lg transition-colors
-                              ${lesson.isPublished ? "text-green-600 hover:bg-green-50" : "text-gray-400 hover:bg-gray-200"}`}
-                          >
-                            {lesson.isPublished ? (
-                              <LockOpenIcon className="w-4 h-4" />
-                            ) : (
-                              <LockClosedIcon className="w-4 h-4" />
-                            )}
-                          </button>
-                          <button
-                            onClick={() => handleDeleteLesson(lesson.id)}
-                            className="p-2 rounded-lg text-red-400 hover:bg-red-50"
-                          >
-                            <TrashIcon className="w-4 h-4" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+              <div className="flex items-center gap-2 flex-wrap mb-2">
+                <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+                  {course.subjectCode}
+                </span>
+                {course.className && (
+                  <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-200/70 text-slate-700">
+                    {course.className}
+                  </span>
+                )}
+              </div>
+              <h1 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 leading-tight">
+                {course.subjectName}
+              </h1>
+              <div className="flex items-center gap-5 mt-4 text-sm text-slate-600 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-full bg-blue-600/10 border border-blue-100 flex items-center justify-center">
+                    <BookOpenIcon className="w-4 h-4 text-blue-700" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">Giảng viên</p>
+                    <p className="font-semibold text-slate-800">
+                      {course.teacherName}
+                    </p>
+                  </div>
                 </div>
+                <div className="h-8 w-px bg-slate-300 hidden md:block" />
+                <div className="flex items-center gap-2 text-slate-500">
+                  <CalendarDaysIcon className="w-4 h-4" />
+                  <span>{course.semester || "Học kỳ hiện tại"}</span>
+                </div>
+              </div>
+              {course.subjectDescription && (
+                <p className="mt-4 text-sm md:text-base text-slate-500 max-w-3xl">
+                  {course.subjectDescription}
+                </p>
               )}
             </div>
-          )}
+          </div>
+        </header>
 
-          {/* Tab Bài tập */}
-          {activeTab === 1 && (
-            <div>
-              {isTeacher && (
-                <button
-                  onClick={() => {
-                    setEditingAssignment(null);
-                    setShowAssignmentModal(true);
-                  }}
-                  className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-purple-700 mb-4"
-                >
-                  <PlusIcon className="w-4 h-4" /> Thêm bài tập
-                </button>
-              )}
-              {assignments.length === 0 ? (
-                <p className="text-center text-gray-400 py-10">
-                  Chưa có bài tập nào
-                </p>
-              ) : (
-                <div className="space-y-2 md:space-y-3">
-                  {assignments.map((a) => (
+        <div className="flex flex-col xl:flex-row gap-8 xl:gap-10">
+          <div className="flex-1 space-y-8">
+            <section className="relative rounded-[1.75rem] overflow-hidden bg-slate-900 shadow-2xl shadow-slate-300/40">
+              <div className="aspect-video bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.3),transparent_40%),radial-gradient(circle_at_80%_80%,rgba(99,102,241,0.35),transparent_35%)]" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                {featuredLesson ? (
+                  <Link
+                    to={`/lessons/${featuredLesson.id}?courseId=${id}`}
+                    state={{ fromCoursePath: `/courses/${id}` }}
+                    className="w-20 h-20 rounded-full bg-white/20 backdrop-blur border border-white/30 flex items-center justify-center hover:scale-110 transition-transform"
+                  >
+                    <PlayCircleIcon className="w-12 h-12 text-white" />
+                  </Link>
+                ) : (
+                  <div className="text-white/70 text-sm">
+                    Chưa có bài giảng để xem
+                  </div>
+                )}
+              </div>
+              {featuredLesson && (
+                <div className="absolute left-0 right-0 bottom-0 p-5 md:p-8 bg-gradient-to-t from-slate-950/95 to-transparent">
+                  <h4 className="text-white text-base md:text-lg font-semibold mb-2">
+                    {featuredLesson.title}
+                  </h4>
+                  <div className="h-1.5 rounded-full bg-white/20 overflow-hidden max-w-md">
                     <div
-                      key={a.id}
-                      className={`p-3 md:p-4 rounded-xl border ${a.isPublished ? "border-gray-100" : "border-dashed border-gray-200 opacity-75"}`}
-                    >
-                      {/* Row 1: badges + action buttons */}
-                      <div className="flex items-start justify-between gap-2 mb-1.5">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span
-                            className={`text-xs px-2 py-0.5 rounded-full font-medium
-                            ${
-                              a.type === "quiz"
-                                ? "bg-purple-100 text-purple-700"
-                                : a.type === "essay"
-                                  ? "bg-blue-100 text-blue-700"
-                                  : "bg-green-100 text-green-700"
+                      className="h-full bg-blue-300"
+                      style={{ width: `${Math.min(progressPercent, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </section>
+
+            <section className="bg-white/90 backdrop-blur-sm rounded-[1.5rem] border border-slate-100 shadow-xl shadow-slate-200/30 p-4 md:p-6">
+              <div className="flex items-center gap-7 border-b border-slate-200/70 overflow-x-auto">
+                {TABS.map((tab, i) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(i)}
+                    className={`relative pb-4 text-base md:text-lg font-semibold whitespace-nowrap transition-colors ${
+                      activeTab === i
+                        ? "text-slate-900"
+                        : "text-slate-400 hover:text-slate-700"
+                    }`}
+                  >
+                    {tab}
+                    {activeTab === i && (
+                      <span className="absolute bottom-0 left-0 right-0 h-1 rounded-full bg-blue-600" />
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              <div className="pt-5">
+                {activeTab === 0 && (
+                  <div>
+                    {isTeacher && (
+                      <button
+                        onClick={() => setShowLessonModal(true)}
+                        className="mb-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700"
+                      >
+                        <PlusIcon className="w-4 h-4" />
+                        Thêm bài giảng
+                      </button>
+                    )}
+                    {lessons.length === 0 ? (
+                      <p className="text-center text-slate-400 py-12">
+                        Chưa có bài giảng nào
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {lessons.map((lesson, i) => (
+                          <div
+                            key={lesson.id}
+                            className={`p-4 md:p-5 rounded-2xl border transition-all ${
+                              lesson.isPublished
+                                ? "bg-white border-slate-200 hover:border-blue-200 hover:shadow-md"
+                                : "bg-slate-100/70 border-dashed border-slate-300 opacity-80"
                             }`}
                           >
-                            {a.type === "quiz"
-                              ? "Trắc nghiệm"
-                              : a.type === "essay"
-                                ? "Tự luận"
-                                : "Nộp file"}
-                          </span>
-                          {!a.isPublished && isTeacher && (
-                            <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full">
-                              Chưa đăng
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Action buttons — icon only on mobile */}
-                        <div className="flex items-center gap-0.5 flex-shrink-0">
-                          {user.role === "student" && (
-                            <span
-                              className={`text-xs px-2 py-1 rounded-full font-medium
-                              ${
-                                a.mySubmissions > 0
-                                  ? a.myScore !== null
-                                    ? "bg-green-100 text-green-700"
-                                    : "bg-blue-100 text-blue-600"
-                                  : "bg-gray-100 text-gray-500"
-                              }`}
-                            >
-                              {a.mySubmissions > 0
-                                ? a.myScore !== null
-                                  ? `${a.myScore}đ`
-                                  : "Đã nộp"
-                                : "Chưa làm"}
-                            </span>
-                          )}
-                          {isTeacher && (
-                            <>
-                              <Link
-                                to={`/assignments/${a.id}/submissions`}
-                                className="hidden sm:block text-xs bg-gray-100 text-gray-600 px-2.5 py-1.5 rounded-lg hover:bg-gray-200 whitespace-nowrap"
-                              >
-                                Bài nộp
-                              </Link>
-                              <button
-                                onClick={() =>
-                                  handlePublishAssignment(a.id, !a.isPublished)
-                                }
-                                className={`p-1.5 rounded-lg transition-colors
-                                  ${a.isPublished ? "text-green-600 hover:bg-green-50" : "text-gray-400 hover:bg-gray-200"}`}
-                              >
-                                {a.isPublished ? (
-                                  <LockOpenIcon className="w-4 h-4" />
-                                ) : (
-                                  <LockClosedIcon className="w-4 h-4" />
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-4 min-w-0">
+                                <div
+                                  className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold ${
+                                    lesson.isPublished
+                                      ? "bg-blue-600 text-white"
+                                      : "bg-slate-200 text-slate-500"
+                                  }`}
+                                >
+                                  {String(i + 1).padStart(2, "0")}
+                                </div>
+                                <div className="min-w-0">
+                                  <Link
+                                    to={`/lessons/${lesson.id}?courseId=${id}`}
+                                    state={{ fromCoursePath: `/courses/${id}` }}
+                                    className="text-slate-800 font-semibold hover:text-blue-600 block truncate"
+                                  >
+                                    {lesson.title}
+                                  </Link>
+                                  <div className="flex items-center gap-2 mt-1 text-xs">
+                                    <span className="inline-flex items-center gap-1 text-slate-500">
+                                      <ClockIcon className="w-3.5 h-3.5" />
+                                      Bài giảng #{i + 1}
+                                    </span>
+                                    {!lesson.isPublished && isTeacher && (
+                                      <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold">
+                                        Chưa đăng
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Link
+                                  to={`/lessons/${lesson.id}?courseId=${id}`}
+                                  state={{ fromCoursePath: `/courses/${id}` }}
+                                  className="hidden md:inline-flex px-3 py-2 rounded-full text-xs font-semibold border border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-700"
+                                >
+                                  Mở bài
+                                </Link>
+                                {isTeacher && (
+                                  <>
+                                    <button
+                                      onClick={() =>
+                                        handlePublishLesson(
+                                          lesson.id,
+                                          !lesson.isPublished,
+                                        )
+                                      }
+                                      className={`p-2 rounded-xl ${
+                                        lesson.isPublished
+                                          ? "text-green-600 hover:bg-green-50"
+                                          : "text-slate-400 hover:bg-slate-200"
+                                      }`}
+                                    >
+                                      {lesson.isPublished ? (
+                                        <LockOpenIcon className="w-4 h-4" />
+                                      ) : (
+                                        <LockClosedIcon className="w-4 h-4" />
+                                      )}
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleDeleteLesson(lesson.id)
+                                      }
+                                      className="p-2 rounded-xl text-red-400 hover:bg-red-50"
+                                    >
+                                      <TrashIcon className="w-4 h-4" />
+                                    </button>
+                                  </>
                                 )}
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setEditingAssignment(a);
-                                  setShowAssignmentModal(true);
-                                }}
-                                className="p-1.5 rounded-lg text-blue-500 hover:bg-blue-50"
-                              >
-                                <PencilIcon className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => setDeletingAssignment(a)}
-                                className="p-1.5 rounded-lg text-red-400 hover:bg-red-50"
-                              >
-                                <TrashIcon className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
-                        </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
+                    )}
+                  </div>
+                )}
 
-                      {/* Row 2: title */}
-                      <Link
-                        to={`/assignments/${a.id}`}
-                        className="font-medium text-gray-800 hover:text-blue-600 text-sm block truncate mb-1"
+                {activeTab === 1 && (
+                  <div>
+                    {isTeacher && (
+                      <button
+                        onClick={() => {
+                          setEditingAssignment(null);
+                          setShowAssignmentModal(true);
+                        }}
+                        className="mb-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700"
                       >
-                        {a.title}
-                      </Link>
-
-                      {/* Row 3: meta info + mobile "Bài nộp" link */}
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <div className="flex flex-wrap gap-2 text-xs text-gray-400">
-                          {a.dueDate && (
-                            <span>
-                              📅{" "}
-                              {format(new Date(a.dueDate), "dd/MM HH:mm", {
-                                locale: vi,
-                              })}
-                            </span>
-                          )}
-                          {a.timeLimitMinutes && (
-                            <span>⏱ {a.timeLimitMinutes}ph</span>
-                          )}
-                          <span>💯 {a.totalPoints}đ</span>
-                        </div>
-                        {isTeacher && (
-                          <Link
-                            to={`/assignments/${a.id}/submissions`}
-                            className="sm:hidden text-xs text-blue-600 hover:underline"
+                        <PlusIcon className="w-4 h-4" />
+                        Thêm bài tập
+                      </button>
+                    )}
+                    {assignments.length === 0 ? (
+                      <p className="text-center text-slate-400 py-12">
+                        Chưa có bài tập nào
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {assignments.map((a) => (
+                          <div
+                            key={a.id}
+                            className={`p-4 rounded-2xl border ${
+                              a.isPublished
+                                ? "bg-white border-slate-200"
+                                : "bg-slate-100/60 border-dashed border-slate-300 opacity-85"
+                            }`}
                           >
-                            Xem bài nộp →
-                          </Link>
-                        )}
+                            <div className="flex items-start justify-between gap-3 mb-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span
+                                  className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
+                                    a.type === "quiz"
+                                      ? "bg-violet-100 text-violet-700"
+                                      : a.type === "essay"
+                                        ? "bg-blue-100 text-blue-700"
+                                        : "bg-emerald-100 text-emerald-700"
+                                  }`}
+                                >
+                                  {a.type === "quiz"
+                                    ? "Trắc nghiệm"
+                                    : a.type === "essay"
+                                      ? "Tự luận"
+                                      : "Nộp file"}
+                                </span>
+                                {!a.isPublished && isTeacher && (
+                                  <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700 font-semibold">
+                                    Chưa đăng
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-1">
+                                {user.role === "student" && (
+                                  <span
+                                    className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
+                                      a.mySubmissions > 0
+                                        ? a.myScore !== null
+                                          ? "bg-green-100 text-green-700"
+                                          : "bg-blue-100 text-blue-700"
+                                        : "bg-slate-200 text-slate-600"
+                                    }`}
+                                  >
+                                    {a.mySubmissions > 0
+                                      ? a.myScore !== null
+                                        ? `${a.myScore}đ`
+                                        : "Đã nộp"
+                                      : "Chưa làm"}
+                                  </span>
+                                )}
+                                {isTeacher && (
+                                  <>
+                                    <Link
+                                      to={`/assignments/${a.id}/submissions`}
+                                      className="hidden sm:inline-flex px-2.5 py-1.5 rounded-lg text-xs bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                    >
+                                      Bài nộp
+                                    </Link>
+                                    <button
+                                      onClick={() =>
+                                        handlePublishAssignment(
+                                          a.id,
+                                          !a.isPublished,
+                                        )
+                                      }
+                                      className={`p-1.5 rounded-lg ${
+                                        a.isPublished
+                                          ? "text-green-600 hover:bg-green-50"
+                                          : "text-slate-400 hover:bg-slate-200"
+                                      }`}
+                                    >
+                                      {a.isPublished ? (
+                                        <LockOpenIcon className="w-4 h-4" />
+                                      ) : (
+                                        <LockClosedIcon className="w-4 h-4" />
+                                      )}
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setEditingAssignment(a);
+                                        setShowAssignmentModal(true);
+                                      }}
+                                      className="p-1.5 rounded-lg text-blue-500 hover:bg-blue-50"
+                                    >
+                                      <PencilIcon className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => setDeletingAssignment(a)}
+                                      className="p-1.5 rounded-lg text-red-400 hover:bg-red-50"
+                                    >
+                                      <TrashIcon className="w-4 h-4" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            <Link
+                              to={`/assignments/${a.id}`}
+                              className="font-semibold text-slate-800 hover:text-blue-600 block"
+                            >
+                              {a.title}
+                            </Link>
+
+                            <div className="mt-2 flex items-center justify-between gap-3 flex-wrap text-xs text-slate-500">
+                              <div className="flex items-center gap-3 flex-wrap">
+                                {a.dueDate && (
+                                  <span className="inline-flex items-center gap-1">
+                                    <CalendarDaysIcon className="w-3.5 h-3.5" />
+                                    {format(
+                                      new Date(a.dueDate),
+                                      "dd/MM HH:mm",
+                                      { locale: vi },
+                                    )}
+                                  </span>
+                                )}
+                                {a.timeLimitMinutes && (
+                                  <span className="inline-flex items-center gap-1">
+                                    <ClockIcon className="w-3.5 h-3.5" />
+                                    {a.timeLimitMinutes} phút
+                                  </span>
+                                )}
+                                <span>{a.totalPoints} điểm</span>
+                              </div>
+                              {isTeacher && (
+                                <Link
+                                  to={`/assignments/${a.id}/submissions`}
+                                  className="sm:hidden text-blue-600 hover:underline"
+                                >
+                                  Xem bài nộp
+                                </Link>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                  ))}
+                    )}
+                  </div>
+                )}
+
+                {activeTab === 2 && (
+                  <div>
+                    {canManageAnnouncements && (
+                      <button
+                        onClick={() => setShowAnnouncementModal(true)}
+                        className="mb-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700"
+                      >
+                        <PlusIcon className="w-4 h-4" />
+                        Thêm thông báo
+                      </button>
+                    )}
+
+                    {announcements.length === 0 ? (
+                      <p className="text-center text-slate-400 py-12">
+                        Chưa có thông báo nào
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {announcements.map((ann) => (
+                          <div
+                            key={ann.id}
+                            className="p-4 md:p-5 bg-slate-50 rounded-2xl border border-slate-200"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <h3 className="font-semibold text-slate-800 text-sm md:text-base">
+                                {ann.title}
+                              </h3>
+                              {canManageAnnouncements && (
+                                <button
+                                  onClick={() => handleDeleteAnnouncement(ann)}
+                                  className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg"
+                                >
+                                  <TrashIcon className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                            <p className="text-slate-600 text-sm mt-1.5 whitespace-pre-wrap">
+                              {ann.content}
+                            </p>
+                            <p className="text-slate-400 text-xs mt-3">
+                              {ann.authorName} •{" "}
+                              {format(
+                                new Date(ann.createdAt),
+                                "dd/MM/yyyy HH:mm",
+                              )}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </section>
+          </div>
+
+          <aside className="w-full xl:w-80 space-y-6">
+            <div className="bg-white/90 backdrop-blur-sm p-6 rounded-[1.75rem] border border-slate-100 shadow-lg shadow-slate-200/30">
+              <h6 className="font-bold text-slate-900 mb-4">
+                Tiến độ khóa học
+              </h6>
+              <div className="relative w-32 h-32 mx-auto mb-5">
+                <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="45"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="8"
+                    className="text-slate-200"
+                  />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="45"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                    className="text-blue-600"
+                    strokeDasharray="282.7"
+                    strokeDashoffset={282.7 - (282.7 * progressPercent) / 100}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-2xl font-black text-slate-900">
+                    {progressPercent}%
+                  </span>
+                  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
+                    Nội dung mở
+                  </span>
                 </div>
-              )}
+              </div>
+              <div className="space-y-3 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Bài giảng đã đăng</span>
+                  <span className="font-semibold text-slate-900">
+                    {publishedLessonsCount}/{lessons.length}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Bài tập</span>
+                  <span className="font-semibold text-slate-900">
+                    {assignments.length}
+                  </span>
+                </div>
+              </div>
             </div>
-          )}
 
-          {/* Tab Thông báo */}
-          {activeTab === 2 && (
-            <div>
-              {canManageAnnouncements && (
-                <button
-                  onClick={() => setShowAnnouncementModal(true)}
-                  className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700 mb-4 active:bg-blue-800"
-                >
-                  <PlusIcon className="w-4 h-4" /> Thêm thông báo
-                </button>
-              )}
-
-              {announcements.length === 0 ? (
-                <p className="text-center text-gray-400 py-10">
-                  Chưa có thông báo nào
+            <div className="bg-slate-100/80 p-6 rounded-[1.75rem] border border-slate-200/70">
+              <h6 className="font-bold text-slate-900 mb-4">Sắp tới hạn</h6>
+              {upcomingDeadlines.length === 0 ? (
+                <p className="text-sm text-slate-500">
+                  Chưa có deadline sắp tới.
                 </p>
               ) : (
-                <div className="space-y-3">
-                  {announcements.map((ann) => (
-                    <div
-                      key={ann.id}
-                      className="p-4 bg-gray-50 rounded-xl border border-gray-100"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <h3 className="font-semibold text-gray-800 text-sm">
-                          {ann.title}
-                        </h3>
-                        {canManageAnnouncements && (
-                          <button
-                            onClick={() => handleDeleteAnnouncement(ann)}
-                            className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg flex-shrink-0 -mt-1"
-                          >
-                            <TrashIcon className="w-4 h-4" />
-                          </button>
-                        )}
+                <div className="space-y-4">
+                  {upcomingDeadlines.map((item) => (
+                    <div key={item.id} className="flex gap-3">
+                      <div className="w-12 h-14 rounded-xl bg-white flex flex-col items-center justify-center shadow-sm">
+                        <span className="text-[10px] uppercase font-bold text-blue-600">
+                          {format(new Date(item.dueDate), "MMM", {
+                            locale: vi,
+                          })}
+                        </span>
+                        <span className="text-lg font-bold text-slate-900 leading-none">
+                          {format(new Date(item.dueDate), "dd")}
+                        </span>
                       </div>
-                      <p className="text-gray-500 text-sm mt-1 whitespace-pre-wrap">
-                        {ann.content}
-                      </p>
-                      <p className="text-gray-400 text-xs mt-2">
-                        {ann.authorName} •{" "}
-                        {format(new Date(ann.createdAt), "dd/MM/yyyy HH:mm")}
-                      </p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 truncate">
+                          {item.title}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Hạn:{" "}
+                          {format(new Date(item.dueDate), "dd/MM/yyyy HH:mm", {
+                            locale: vi,
+                          })}
+                        </p>
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
-          )}
+
+            <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-600 p-6 rounded-[1.75rem] text-white shadow-xl shadow-blue-400/30">
+              <div className="relative z-10">
+                <span className="inline-block px-3 py-1 rounded-full bg-white/20 text-[10px] font-bold uppercase tracking-wider mb-3">
+                  Quick Action
+                </span>
+                <h6 className="text-xl font-extrabold mb-2">
+                  Bảng điều khiển khóa học
+                </h6>
+                <p className="text-white/85 text-sm mb-5 leading-relaxed">
+                  Truy cập tổng quan khóa học, theo dõi bài tập và các hoạt động
+                  lớp học nhanh hơn.
+                </p>
+                <Link
+                  to="/courses"
+                  className="w-full inline-flex items-center justify-center gap-2 py-3.5 bg-white text-blue-700 rounded-full font-bold text-sm"
+                >
+                  Về trang môn học
+                  <ArrowTopRightOnSquareIcon className="w-4 h-4" />
+                </Link>
+              </div>
+              <div className="absolute -top-12 -right-12 w-44 h-44 bg-white/10 rounded-full blur-3xl" />
+              <div className="absolute -bottom-8 -left-8 w-28 h-28 bg-white/20 rounded-full blur-2xl" />
+            </div>
+          </aside>
         </div>
       </div>
 

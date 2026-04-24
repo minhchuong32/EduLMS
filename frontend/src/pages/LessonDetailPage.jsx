@@ -1,9 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { lessonApi } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
-import { PaperClipIcon, ChatBubbleLeftIcon } from "@heroicons/react/24/outline";
+import {
+  ArrowLeftIcon,
+  PaperClipIcon,
+  ChatBubbleLeftIcon,
+} from "@heroicons/react/24/outline";
 import { format } from "date-fns";
 
 const FILE_BASE_URL = (
@@ -12,6 +16,8 @@ const FILE_BASE_URL = (
 
 export default function LessonDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [lesson, setLesson] = useState(null);
   const [comment, setComment] = useState("");
@@ -102,6 +108,13 @@ export default function LessonDetailPage() {
     );
 
   const embedUrl = getEmbedUrl(lesson.videoUrl);
+  const searchParams = new URLSearchParams(location.search);
+  const courseIdFromQuery = searchParams.get("courseId");
+  const backToCoursePath =
+    location.state?.fromCoursePath ||
+    (courseIdFromQuery && `/courses/${courseIdFromQuery}`) ||
+    (lesson.courseEnrollmentId && `/courses/${lesson.courseEnrollmentId}`) ||
+    "/courses";
   const comments = lesson.comments || [];
   const commentMap = comments.reduce((acc, item) => {
     acc[item.id] = { ...item, children: [] };
@@ -213,6 +226,20 @@ export default function LessonDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-3 md:p-6">
+      <div className="mb-3">
+        <Link
+          to={backToCoursePath}
+          onClick={(e) => {
+            e.preventDefault();
+            navigate(backToCoursePath);
+          }}
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium"
+        >
+          <ArrowLeftIcon className="w-4 h-4" />
+          Quay lại chi tiết khóa học
+        </Link>
+      </div>
+
       {/* Main content */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-8 mb-4 md:mb-6">
         <div className="flex items-center gap-2 mb-2">
