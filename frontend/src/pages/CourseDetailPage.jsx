@@ -22,6 +22,8 @@ import {
   ClockIcon,
   CalendarDaysIcon,
   ArrowTopRightOnSquareIcon,
+  PaperClipIcon,
+  ChatBubbleLeftIcon,
 } from "@heroicons/react/24/outline";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
@@ -29,6 +31,18 @@ import CreateLessonModal from "../components/teacher/CreateLessonModal";
 import CreateAssignmentModal from "../components/teacher/CreateAssignmentModal";
 
 const TABS = ["Bài giảng", "Bài tập", "Thông báo"];
+const FILE_BASE_URL = (
+  process.env.REACT_APP_API_URL || "http://localhost:5000/api"
+).replace(/\/api\/?$/, "");
+
+const getEmbedUrl = (url) => {
+  if (!url) return null;
+  const ytMatch = url.match(
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/,
+  );
+  if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
+  return url;
+};
 
 function DeleteConfirmModal({ assignment, onConfirm, onCancel }) {
   return (
@@ -92,6 +106,13 @@ export default function CourseDetailPage() {
     content: "",
   });
   const [submittingAnnouncement, setSubmittingAnnouncement] = useState(false);
+  const [selectedLessonId, setSelectedLessonId] = useState(null);
+  const [selectedLessonDetail, setSelectedLessonDetail] = useState(null);
+  const [selectedLessonLoading, setSelectedLessonLoading] = useState(false);
+  const [comment, setComment] = useState("");
+  const [replyTo, setReplyTo] = useState(null);
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editComment, setEditComment] = useState("");
 
   const isTeacher = user.role === "teacher" || user.role === "admin";
   const canManageAnnouncements = user.role !== "student";
@@ -135,6 +156,45 @@ export default function CourseDetailPage() {
     load();
   }, [id]);
 
+  useEffect(() => {
+    if (lessons.length === 0) {
+      setSelectedLessonId(null);
+      setSelectedLessonDetail(null);
+      return;
+    }
+
+    const hasSelected = lessons.some(
+      (lesson) => lesson.id === selectedLessonId,
+    );
+    if (hasSelected) return;
+
+    const firstLesson =
+      lessons.find((lesson) => lesson.isPublished) || lessons[0];
+    setSelectedLessonId(firstLesson?.id || null);
+  }, [lessons, selectedLessonId]);
+
+  useEffect(() => {
+    if (!selectedLessonId) return;
+
+    let mounted = true;
+    setSelectedLessonLoading(true);
+    lessonApi
+      .getById(selectedLessonId)
+      .then((res) => {
+        if (mounted) setSelectedLessonDetail(res.data);
+      })
+      .catch((err) => {
+        toast.error(err.response?.data?.error || "Không tải được bài giảng");
+      })
+      .finally(() => {
+        if (mounted) setSelectedLessonLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [selectedLessonId]);
+
   const handlePublishLesson = async (lessonId, publish) => {
     await lessonApi.publish(lessonId, publish);
     setLessons((prev) =>
@@ -147,7 +207,66 @@ export default function CourseDetailPage() {
     if (!window.confirm("Xóa bài giảng này?")) return;
     await lessonApi.delete(lessonId);
     setLessons((prev) => prev.filter((l) => l.id !== lessonId));
+    if (selectedLessonId === lessonId) {
+      setSelectedLessonId(null);
+      setSelectedLessonDetail(null);
+    }
     toast.success("Đã xóa bài giảng");
+  };
+
+  const refreshSelectedLesson = async () => {
+    if (!selectedLessonId) return;
+    const { data } = await lessonApi.getById(selectedLessonId);
+    setSelectedLessonDetail(data);
+  };
+
+  const handleComment = async (e) => {
+    e.preventDefault();
+    if (!comment.trim() || !selectedLessonId) return;
+    try {
+      await lessonApi.addComment(selectedLessonId, {
+        content: comment,
+        parentId: replyTo?.id || null,
+      });
+      await refreshSelectedLesson();
+      setComment("");
+      setReplyTo(null);
+      toast.success("Đã thêm bình luận");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Không thể thêm bình luận");
+    }
+  };
+
+  const handleEditComment = async (e) => {
+    e.preventDefault();
+    if (!editComment.trim() || !editingCommentId || !selectedLessonId) return;
+
+    try {
+      await lessonApi.updateComment(selectedLessonId, editingCommentId, {
+        content: editComment,
+      });
+      await refreshSelectedLesson();
+      setEditingCommentId(null);
+      setEditComment("");
+      toast.success("Đã cập nhật bình luận");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Không thể cập nhật bình luận");
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!selectedLessonId) return;
+    if (!window.confirm("Bạn có chắc muốn xóa bình luận này không?")) return;
+
+    try {
+      await lessonApi.deleteComment(selectedLessonId, commentId);
+      await refreshSelectedLesson();
+      setEditingCommentId(null);
+      setEditComment("");
+      toast.success("Đã xóa bình luận");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Không thể xóa bình luận");
+    }
   };
 
   const handlePublishAssignment = async (assignmentId, publish) => {
@@ -232,7 +351,122 @@ export default function CourseDetailPage() {
       ? Math.round((publishedLessonsCount / lessons.length) * 100)
       : 0;
   const featuredLesson =
-    lessons.find((lesson) => lesson.isPublished) || lessons[0];
+    lessons.find((lesson) => lesson.id === selectedLessonId) ||
+    lessons.find((lesson) => lesson.isPublished) ||
+    lessons[0];
+  const embedUrl = getEmbedUrl(selectedLessonDetail?.videoUrl);
+  const canManageComments = ["admin", "teacher"].includes(user?.role);
+  const comments = selectedLessonDetail?.comments || [];
+  const commentMap = comments.reduce((acc, item) => {
+    acc[item.id] = { ...item, children: [] };
+    return acc;
+  }, {});
+  const rootComments = [];
+  Object.values(commentMap).forEach((item) => {
+    if (item.parentId && commentMap[item.parentId]) {
+      commentMap[item.parentId].children.push(item);
+    } else {
+      rootComments.push(item);
+    }
+  });
+
+  const renderComment = (item, depth = 0) => (
+    <div
+      key={item.id}
+      className={depth > 0 ? "ml-8 pl-4 border-l border-gray-100" : ""}
+    >
+      <div className="flex gap-2.5">
+        <div className="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center flex-shrink-0 text-white text-xs font-bold">
+          {item.authorName?.[0]}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-0.5">
+            <span className="text-sm font-medium text-gray-800">
+              {item.authorName}
+            </span>
+            <span
+              className={`text-xs px-1.5 py-0.5 rounded-full ${
+                item.authorRole === "teacher"
+                  ? "bg-blue-100 text-blue-600"
+                  : "bg-gray-100 text-gray-500"
+              }`}
+            >
+              {item.authorRole === "teacher" ? "Giáo viên" : "Học sinh"}
+            </span>
+            <span className="text-xs text-gray-400">
+              {format(new Date(item.createdAt), "dd/MM HH:mm")}
+            </span>
+          </div>
+          <p className="text-sm text-gray-700 whitespace-pre-wrap">
+            {item.content}
+          </p>
+          <div className="mt-1 flex flex-wrap gap-3 text-xs font-medium">
+            <button
+              type="button"
+              onClick={() => setReplyTo(item)}
+              className="text-blue-600 hover:text-blue-700"
+            >
+              Trả lời
+            </button>
+            {canManageComments && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingCommentId(item.id);
+                    setEditComment(item.content);
+                  }}
+                  className="text-amber-600 hover:text-amber-700"
+                >
+                  Sửa
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteComment(item.id)}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  Xóa
+                </button>
+              </>
+            )}
+          </div>
+          {editingCommentId === item.id && (
+            <form onSubmit={handleEditComment} className="mt-3 space-y-2">
+              <textarea
+                value={editComment}
+                onChange={(e) => setEditComment(e.target.value)}
+                rows={3}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  className="px-3 py-2 bg-blue-600 text-white rounded-xl text-xs hover:bg-blue-700"
+                >
+                  Lưu
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingCommentId(null);
+                    setEditComment("");
+                  }}
+                  className="px-3 py-2 bg-gray-100 text-gray-700 rounded-xl text-xs hover:bg-gray-200"
+                >
+                  Hủy
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+      {item.children?.length > 0 && (
+        <div className="mt-3 space-y-3">
+          {item.children.map((child) => renderComment(child, depth + 1))}
+        </div>
+      )}
+    </div>
+  );
   const upcomingDeadlines = assignments
     .filter((assignment) => assignment.dueDate)
     .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
@@ -315,35 +549,50 @@ export default function CourseDetailPage() {
 
         <div className="flex flex-col xl:flex-row gap-8 xl:gap-10">
           <div className="flex-1 space-y-8">
-            <section className="relative rounded-[1.75rem] overflow-hidden bg-slate-900 shadow-2xl shadow-slate-300/40">
-              <div className="aspect-video bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950" />
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.3),transparent_40%),radial-gradient(circle_at_80%_80%,rgba(99,102,241,0.35),transparent_35%)]" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                {featuredLesson ? (
-                  <Link
-                    to={`/lessons/${featuredLesson.id}?courseId=${id}`}
-                    state={{ fromCoursePath: `/courses/${id}` }}
-                    className="w-20 h-20 rounded-full bg-white/20 backdrop-blur border border-white/30 flex items-center justify-center hover:scale-110 transition-transform"
-                  >
-                    <PlayCircleIcon className="w-12 h-12 text-white" />
-                  </Link>
+            <section className="rounded-[1.75rem] overflow-hidden bg-slate-900 shadow-2xl shadow-slate-300/40 relative">
+              <div className="aspect-video bg-black">
+                {selectedLessonLoading ? (
+                  <div className="w-full h-full flex items-center justify-center text-white/70 text-sm">
+                    Đang tải video...
+                  </div>
+                ) : embedUrl ? (
+                  <iframe
+                    src={embedUrl}
+                    className="w-full h-full"
+                    allowFullScreen
+                    title={selectedLessonDetail?.title || "Video bài giảng"}
+                  />
                 ) : (
-                  <div className="text-white/70 text-sm">
-                    Chưa có bài giảng để xem
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white/75 text-sm">
+                    {featuredLesson
+                      ? "Bài giảng này chưa có video"
+                      : "Chưa có bài giảng để xem"}
                   </div>
                 )}
               </div>
               {featuredLesson && (
-                <div className="absolute left-0 right-0 bottom-0 p-5 md:p-8 bg-gradient-to-t from-slate-950/95 to-transparent">
-                  <h4 className="text-white text-base md:text-lg font-semibold mb-2">
+                <div className="p-5 md:p-6 bg-gradient-to-r from-slate-900 to-slate-800 text-white">
+                  <h4 className="text-base md:text-lg font-semibold mb-2 flex items-center gap-2">
+                    <PlayCircleIcon className="w-5 h-5 text-blue-300" />
                     {featuredLesson.title}
                   </h4>
-                  <div className="h-1.5 rounded-full bg-white/20 overflow-hidden max-w-md">
+                  <div className="h-1.5 rounded-full bg-white/20 overflow-hidden max-w-md mb-3">
                     <div
                       className="h-full bg-blue-300"
                       style={{ width: `${Math.min(progressPercent, 100)}%` }}
                     />
                   </div>
+                  {selectedLessonDetail?.fileUrl && (
+                    <a
+                      href={`${FILE_BASE_URL}${selectedLessonDetail.fileUrl}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
+                    >
+                      <PaperClipIcon className="w-4 h-4" />
+                      Tài liệu đính kèm
+                    </a>
+                  )}
                 </div>
               )}
             </section>
@@ -390,6 +639,10 @@ export default function CourseDetailPage() {
                           <div
                             key={lesson.id}
                             className={`p-4 md:p-5 rounded-2xl border transition-all ${
+                              selectedLessonId === lesson.id
+                                ? "ring-2 ring-blue-200"
+                                : ""
+                            } ${
                               lesson.isPublished
                                 ? "bg-white border-slate-200 hover:border-blue-200 hover:shadow-md"
                                 : "bg-slate-100/70 border-dashed border-slate-300 opacity-80"
@@ -407,13 +660,16 @@ export default function CourseDetailPage() {
                                   {String(i + 1).padStart(2, "0")}
                                 </div>
                                 <div className="min-w-0">
-                                  <Link
-                                    to={`/lessons/${lesson.id}?courseId=${id}`}
-                                    state={{ fromCoursePath: `/courses/${id}` }}
-                                    className="text-slate-800 font-semibold hover:text-blue-600 block truncate"
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setSelectedLessonId(lesson.id)
+                                    }
+                                    disabled={!lesson.isPublished && !isTeacher}
+                                    className="text-slate-800 font-semibold hover:text-blue-600 block truncate text-left disabled:text-slate-400 disabled:cursor-not-allowed"
                                   >
                                     {lesson.title}
-                                  </Link>
+                                  </button>
                                   <div className="flex items-center gap-2 mt-1 text-xs">
                                     <span className="inline-flex items-center gap-1 text-slate-500">
                                       <ClockIcon className="w-3.5 h-3.5" />
@@ -428,13 +684,14 @@ export default function CourseDetailPage() {
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
-                                <Link
-                                  to={`/lessons/${lesson.id}?courseId=${id}`}
-                                  state={{ fromCoursePath: `/courses/${id}` }}
-                                  className="hidden md:inline-flex px-3 py-2 rounded-full text-xs font-semibold border border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-700"
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedLessonId(lesson.id)}
+                                  disabled={!lesson.isPublished && !isTeacher}
+                                  className="hidden md:inline-flex px-3 py-2 rounded-full text-xs font-semibold border border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-700 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed"
                                 >
-                                  Mở bài
-                                </Link>
+                                  Xem video
+                                </button>
                                 {isTeacher && (
                                   <>
                                     <button
@@ -472,6 +729,73 @@ export default function CourseDetailPage() {
                         ))}
                       </div>
                     )}
+
+                    <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
+                      <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2 text-sm md:text-base">
+                        <ChatBubbleLeftIcon className="w-5 h-5" />
+                        Bình luận ({selectedLessonDetail?.comments?.length || 0}
+                        )
+                      </h3>
+
+                      {selectedLessonId ? (
+                        <>
+                          <form
+                            onSubmit={handleComment}
+                            className="flex gap-2.5 mb-5"
+                          >
+                            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 text-white text-xs font-bold mt-0.5">
+                              {user?.fullName?.[0] || "U"}
+                            </div>
+                            <div className="flex-1 space-y-2">
+                              {replyTo && (
+                                <div className="flex items-center justify-between gap-3 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 text-xs text-blue-700">
+                                  <span>Trả lời {replyTo.authorName}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setReplyTo(null)}
+                                    className="font-medium hover:text-blue-800"
+                                  >
+                                    Hủy trả lời
+                                  </button>
+                                </div>
+                              )}
+                              <div className="flex gap-2">
+                                <input
+                                  value={comment}
+                                  onChange={(e) => setComment(e.target.value)}
+                                  placeholder={
+                                    replyTo
+                                      ? `Trả lời ${replyTo.authorName}...`
+                                      : "Viết bình luận..."
+                                  }
+                                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                                <button
+                                  type="submit"
+                                  className="px-3 md:px-4 py-2 bg-blue-600 text-white rounded-xl text-sm hover:bg-blue-700 whitespace-nowrap"
+                                >
+                                  Gửi
+                                </button>
+                              </div>
+                            </div>
+                          </form>
+
+                          <div className="space-y-4">
+                            {rootComments.length > 0 ? (
+                              rootComments.map((c) => renderComment(c))
+                            ) : (
+                              <p className="text-sm text-slate-500">
+                                Chưa có bình luận cho bài giảng này.
+                              </p>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-sm text-slate-500">
+                          Chọn một bài giảng để xem video và bình luận.
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )}
 
