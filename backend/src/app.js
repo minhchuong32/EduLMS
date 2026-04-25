@@ -4,10 +4,11 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const path = require("path");
 const rateLimit = require("express-rate-limit");
-const slowDown = require("express-slow-down"); 
+const slowDown = require("express-slow-down");
 require("dotenv").config();
 
 const app = express();
+const isProduction = process.env.NODE_ENV === "production";
 
 // ======================
 //  SECURITY
@@ -40,7 +41,7 @@ app.use(
       return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
-  })
+  }),
 );
 
 // ======================
@@ -48,20 +49,36 @@ app.use(
 // ======================
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100, 
+  max: isProduction ? 500 : 5000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later." },
 });
 
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isProduction ? 20 : 200,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many login attempts, please try again later." },
+});
+
 // CHỐNG SPAM NHANH (burst)
 const speedLimiter = slowDown({
   windowMs: 15 * 60 * 1000,
-  delayAfter: 20, // sau 20 request bắt đầu delay
+  delayAfter: isProduction ? 60 : 400, // local/dev tránh bị delay quá sớm
+  delayMs: () => 500,
+});
+
+const authSpeedLimiter = slowDown({
+  windowMs: 15 * 60 * 1000,
+  delayAfter: isProduction ? 5 : 100,
   delayMs: () => 500,
 });
 
 // Áp dụng trước routes
+app.use("/api/auth/login", authSpeedLimiter, authLimiter);
 app.use("/api/", speedLimiter);
 app.use("/api/", limiter);
 
@@ -87,7 +104,7 @@ app.use(
     setHeaders: (res) => {
       res.setHeader("X-Content-Type-Options", "nosniff");
     },
-  })
+  }),
 );
 
 // ======================

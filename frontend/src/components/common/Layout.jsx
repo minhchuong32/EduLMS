@@ -286,12 +286,13 @@ export default function Layout() {
     let alive = true;
 
     const safeLoad = async () => {
+      if (document.hidden) return;
       if (!alive) return;
       await loadNotifications();
     };
 
     safeLoad();
-    const timer = setInterval(safeLoad, 15000);
+    const timer = setInterval(safeLoad, 60000);
 
     return () => {
       alive = false;
