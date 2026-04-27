@@ -120,6 +120,7 @@ app.use("/api/assignments", require("./routes/assignment.routes"));
 app.use("/api/submissions", require("./routes/submission.routes"));
 app.use("/api/announcements", require("./routes/announcement.routes"));
 app.use("/api/notifications", require("./routes/notification.routes"));
+app.use("/api/chat", require("./routes/chat.routes"));
 app.use("/api/dashboard", require("./routes/dashboard.routes"));
 
 // ======================

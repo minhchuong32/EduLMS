@@ -8,7 +8,7 @@ const UPLOAD_DIR = process.env.VERCEL
   : path.join(__dirname, "../../uploads");
 
 // Ensure upload directories exist
-["lessons", "assignments", "submissions", "avatars"].forEach((dir) => {
+["lessons", "assignments", "submissions", "avatars", "chat"].forEach((dir) => {
   const dirPath = path.join(UPLOAD_DIR, dir);
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
@@ -22,6 +22,7 @@ const storage = multer.diskStorage({
       assignment: "assignments",
       submission: "submissions",
       avatar: "avatars",
+      chat: "chat",
     };
     const folder = typeMap[req.uploadType] || "misc";
     const dest = path.join(UPLOAD_DIR, folder);

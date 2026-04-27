@@ -585,8 +585,12 @@ export default function Layout() {
         <div className="border-t border-slate-100/80 p-3 space-y-1 dark:border-slate-800/80">
           {/* SUPPORT */}
           <button
-            onClick={() => navigate("/support")} // hoặc mở modal
-            className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-sm text-slate-600 hover:bg-slate-50"
+            onClick={() => navigate("/support")}
+            className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-sm font-medium transition-all ${
+              isActive("/support")
+                ? "border-blue-100 bg-blue-50/80 text-blue-700 shadow-sm"
+                : "border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50"
+            }`}
           >
             <QuestionMarkCircleIcon className="h-5 w-5" />
             {!collapsed && <span>{t.support}</span>}
@@ -807,6 +811,12 @@ export default function Layout() {
                     </div>
                   )}
                   label={t.profile}
+                  onClick={() => setMobileOpen(false)}
+                />
+                <NavLink
+                  to="/support"
+                  icon={QuestionMarkCircleIcon}
+                  label={t.support}
                   onClick={() => setMobileOpen(false)}
                 />
                 <button

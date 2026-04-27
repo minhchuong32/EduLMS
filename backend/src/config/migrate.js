@@ -306,6 +306,45 @@ const migrate = async () => {
     `);
 
     await query(`
+      CREATE TABLE IF NOT EXISTS chatmessages (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        senderId uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        receiverId uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        content text NOT NULL,
+        fileUrl varchar(500),
+        fileName varchar(255),
+        fileMimeType varchar(100),
+        isRead boolean NOT NULL DEFAULT false,
+        createdAt timestamptz NOT NULL DEFAULT now()
+      );
+    `);
+
+    await query(`
+      ALTER TABLE chatmessages
+      ADD COLUMN IF NOT EXISTS fileUrl varchar(500);
+    `);
+
+    await query(`
+      ALTER TABLE chatmessages
+      ADD COLUMN IF NOT EXISTS fileName varchar(255);
+    `);
+
+    await query(`
+      ALTER TABLE chatmessages
+      ADD COLUMN IF NOT EXISTS fileMimeType varchar(100);
+    `);
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_chatmessages_sender_receiver_createdat
+      ON chatmessages (senderId, receiverId, createdAt DESC);
+    `);
+
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_chatmessages_receiver_isread
+      ON chatmessages (receiverId, isRead);
+    `);
+
+    await query(`
       CREATE TABLE IF NOT EXISTS refreshtokens (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         userId uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,

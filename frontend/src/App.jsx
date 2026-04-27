@@ -21,6 +21,7 @@ import AnnouncementsPage from "./pages/AnnouncementsPage";
 import GradingPage from "./pages/GradingPage";
 import NotiPage from "./pages/NotiPage";
 import NotiDetailPage from "./pages/NotiDetailPage";
+import SupportPage from "./pages/SupportPage";
 import Layout from "./components/common/Layout";
 
 const PrivateRoute = ({ children, roles }) => {
@@ -120,6 +121,14 @@ function AppRoutes() {
           element={
             <PrivateRoute roles={["admin"]}>
               <NotiDetailPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="support"
+          element={
+            <PrivateRoute roles={["admin", "teacher", "student"]}>
+              <SupportPage />
             </PrivateRoute>
           }
         />

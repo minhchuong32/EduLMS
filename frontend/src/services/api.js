@@ -217,6 +217,30 @@ export const notificationApi = {
   delete: (id) => api.delete(`/notifications/${id}`),
 };
 
+// Support
+export const supportApi = {
+  createTicket: (data) => api.post("/support/tickets", data),
+  getMyTickets: (params) => api.get("/support/tickets/my", { params }),
+};
+
+// Chat
+export const chatApi = {
+  getContacts: () => api.get("/chat/contacts"),
+  getConversation: (userId, params) =>
+    api.get(`/chat/messages/${userId}`, { params }),
+  sendMessage: (data) => {
+    if (data instanceof FormData) {
+      return api.post("/chat/messages", data, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+    }
+
+    return api.post("/chat/messages", data);
+  },
+  markConversationRead: (userId) => api.put(`/chat/messages/${userId}/read`),
+  clearHistory: () => api.delete("/chat/history"),
+};
+
 // Dashboard
 export const dashboardApi = {
   get: () => api.get("/dashboard"),

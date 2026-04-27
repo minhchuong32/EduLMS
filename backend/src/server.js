@@ -1,9 +1,12 @@
 require("dotenv").config();
+const http = require("http");
+const { Server } = require("socket.io");
 
 process.env.NODE_ENV = process.env.NODE_ENV || "development";
 
 const app = require("./app");
 const { getPool } = require("./config/database");
+const { initChatSocket } = require("./socket/chat.socket");
 
 const isProduction = process.env.NODE_ENV === "production";
 const PORT = Number(process.env.PORT) || 5000;
@@ -27,11 +30,24 @@ const start = async () => {
   try {
     await getPool();
 
-    httpServer = app.listen(PORT, HOST, () => {
+    httpServer = http.createServer(app);
+
+    const io = new Server(httpServer, {
+      cors: {
+        origin: true,
+        credentials: true,
+      },
+      path: "/socket.io",
+    });
+
+    initChatSocket(io);
+
+    httpServer.listen(PORT, HOST, () => {
       console.log(`LMS Server running on http://localhost:${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV}`);
       console.log(`Trust proxy: ${String(app.get("trust proxy"))}`);
       console.log("Mode: single-process (cluster disabled)");
+      console.log("Realtime: socket.io enabled");
     });
 
     httpServer.on("error", (err) => {
