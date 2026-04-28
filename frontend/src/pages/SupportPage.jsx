@@ -459,7 +459,7 @@ export default function SupportPage() {
             <div className="flex items-center gap-2">
               <ChatBubbleLeftRightIcon className="h-5 w-5 text-indigo-600" />
               <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">
-                Chat real-time teacher/admin
+                Chat Hỗ Trợ
               </h2>
             </div>
             <div className="flex items-center gap-2">
@@ -481,7 +481,7 @@ export default function SupportPage() {
                     : "bg-amber-100 text-amber-700"
                 }`}
               >
-                {socketReady ? "Đang kết nối realtime" : "Đang ở chế độ thường"}
+                {socketReady ? "Đang kết nối trực tuyến" : "Đang ở chế độ thường"}
               </span>
             </div>
           </div>
