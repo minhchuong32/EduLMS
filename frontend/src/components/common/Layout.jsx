@@ -534,8 +534,8 @@ export default function Layout() {
       >
         <div className="flex items-center justify-between border-b border-slate-100/80 px-4 py-4">
           {!collapsed && (
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-cyan-500 shadow-lg shadow-blue-500/25">
+            <Link to="/dashboard" className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-cyan-500 shadow-lg shadow-blue-500/25 transition-transform hover:scale-105 active:scale-95">
                 <AcademicCapIcon className="h-5 w-5 text-white" />
               </div>
               <div>
@@ -546,7 +546,7 @@ export default function Layout() {
                   {t.appSubtitle}
                 </span>
               </div>
-            </div>
+            </Link>
           )}
           <div className="flex items-center gap-2">
             <button
@@ -602,14 +602,14 @@ export default function Layout() {
         {!isQuizRoute && (
           <header className="md:hidden z-20 border-b border-slate-100 bg-white/90 px-4 py-3 shadow-sm backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/90">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-cyan-500 shadow-sm">
+              <Link to="/dashboard" className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-cyan-500 shadow-sm transition-transform hover:scale-105 active:scale-95">
                   <AcademicCapIcon className="h-4 w-4 text-white" />
                 </div>
                 <span className="font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
                   EduLMS
                 </span>
-              </div>
+              </Link>
               <div className="flex items-center gap-2">
                 <div className="relative" ref={mobileSettingsPanelRef}>
                   <button
