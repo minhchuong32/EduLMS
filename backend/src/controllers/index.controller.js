@@ -348,6 +348,20 @@ const teacherHasClassAccess = async (classId, teacherId) => {
   return result.recordset.length > 0;
 };
 
+const studentHasClassAccess = async (classId, studentId) => {
+  const result = await query(
+    `
+      SELECT 1
+      FROM StudentClasses
+      WHERE classId = @classId AND studentId = @studentId
+      LIMIT 1
+    `,
+    { classId, studentId },
+  );
+
+  return result.recordset.length > 0;
+};
+
 // ==================== CLASS CONTROLLER ====================
 const getClasses = async (req, res) => {
   try {
@@ -374,6 +388,10 @@ const getClasses = async (req, res) => {
         ? " AND (c.homeroomTeacherId = @teacherId OR EXISTS (SELECT 1 FROM CourseEnrollments ce WHERE ce.classId = c.id AND ce.teacherId = @teacherId AND ce.isActive = true))"
         : " AND EXISTS (SELECT 1 FROM CourseEnrollments ce WHERE ce.classId = c.id AND ce.teacherId = @teacherId AND ce.isActive = true)";
       params.teacherId = req.user.id;
+    } else if (req.user.role === "student") {
+      where +=
+        " AND EXISTS (SELECT 1 FROM StudentClasses sc WHERE sc.classId = c.id AND sc.studentId = @studentId)";
+      params.studentId = req.user.id;
     }
 
     const result = await query(
@@ -418,6 +436,17 @@ const getClassById = async (req, res) => {
       req.user.role === "teacher" &&
       !(await teacherHasClassAccess(id, req.user.id))
     ) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    if (
+      req.user.role === "student" &&
+      !(await studentHasClassAccess(id, req.user.id))
+    ) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    if (!["admin", "teacher", "student"].includes(req.user.role)) {
       return res.status(403).json({ error: "Access denied" });
     }
 
@@ -780,7 +809,27 @@ const getCourseById = async (req, res) => {
     );
     if (!result.recordset.length)
       return res.status(404).json({ error: "Course not found" });
-    res.json(result.recordset[0]);
+
+    const course = result.recordset[0];
+    if (
+      req.user.role === "teacher" &&
+      String(course.teacherId) !== String(req.user.id)
+    ) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    if (
+      req.user.role === "student" &&
+      !(await studentHasClassAccess(course.classId, req.user.id))
+    ) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    if (!["admin", "teacher", "student"].includes(req.user.role)) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    res.json(course);
   } catch (err) {
     res.status(500).json({ error: "Server error" });
   }

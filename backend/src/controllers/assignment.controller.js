@@ -1,10 +1,65 @@
 const { query, withTransaction } = require("../config/database");
 
+const studentHasClassAccess = async (classId, studentId) => {
+  const result = await query(
+    `
+      SELECT 1
+      FROM StudentClasses
+      WHERE classId = @classId AND studentId = @studentId
+      LIMIT 1
+    `,
+    { classId, studentId },
+  );
+
+  return result.recordset.length > 0;
+};
+
+const ensureCourseAccess = async (courseId, user) => {
+  const result = await query(
+    `
+      SELECT id, teacherId, classId
+      FROM CourseEnrollments
+      WHERE id = @id AND isActive = true
+      LIMIT 1
+    `,
+    { id: courseId },
+  );
+
+  if (!result.recordset.length) {
+    return null;
+  }
+
+  const course = result.recordset[0];
+  if (user.role === "admin") {
+    return course;
+  }
+
+  if (user.role === "teacher") {
+    return String(course.teacherId) === String(user.id) ? course : false;
+  }
+
+  if (user.role === "student") {
+    return (await studentHasClassAccess(course.classId, user.id))
+      ? course
+      : false;
+  }
+
+  return false;
+};
+
 // GET /api/assignments/course/:courseId
 const getAssignmentsByCourse = async (req, res) => {
   try {
     const { courseId } = req.params;
     const { role, id: userId } = req.user;
+
+    const courseAccess = await ensureCourseAccess(courseId, req.user);
+    if (!courseAccess) {
+      return res.status(404).json({ error: "Course not found" });
+    }
+    if (courseAccess === false) {
+      return res.status(403).json({ error: "Access denied" });
+    }
 
     let whereClause = "WHERE a.courseEnrollmentId = @courseId";
     if (role === "student") {
@@ -63,6 +118,27 @@ const getAssignment = async (req, res) => {
     }
 
     const assignment = result.recordset[0];
+
+    if (req.user.role === "teacher" && String(assignment.teacherId) !== String(req.user.id)) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    if (req.user.role === "student") {
+      const hasAccess = await studentHasClassAccess(
+        assignment.classId,
+        req.user.id,
+      );
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (
+        !assignment.isPublished ||
+        (assignment.startDate && new Date() < new Date(assignment.startDate))
+      ) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+    }
 
     // Get questions (hide correct answers for students during quiz)
     if (assignment.type === "quiz") {
@@ -334,20 +410,26 @@ const deleteAssignment = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const check = await query(
-      `
-      SELECT a.id FROM Assignments a
-      JOIN CourseEnrollments ce ON a.courseEnrollmentId = ce.id
-      WHERE a.id = @id AND ce.teacherId = @teacherId
-    `,
-      { id, teacherId: req.user.id },
-    );
-
-    if (!check.recordset.length) {
-      return res.status(403).json({ error: "Access denied" });
-    }
-
     await withTransaction(async (client) => {
+      if (req.user.role === "teacher") {
+        const check = await query(
+          `
+          SELECT a.id
+          FROM Assignments a
+          JOIN CourseEnrollments ce ON a.courseEnrollmentId = ce.id
+          WHERE a.id = @id AND ce.teacherId = @teacherId
+        `,
+          { id, teacherId: req.user.id },
+          client,
+        );
+
+        if (!check.recordset.length) {
+          const error = new Error("Access denied");
+          error.status = 403;
+          throw error;
+        }
+      }
+
       await query(
         `
         DELETE FROM StudentAnswers
@@ -377,6 +459,9 @@ const deleteAssignment = async (req, res) => {
     });
     res.json({ message: "Assignment deleted" });
   } catch (err) {
+    if (err.status === 403) {
+      return res.status(403).json({ error: err.message });
+    }
     res.status(500).json({ error: "Server error" });
   }
 };

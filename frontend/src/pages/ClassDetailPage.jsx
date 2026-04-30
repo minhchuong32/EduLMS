@@ -67,7 +67,10 @@ export default function ClassDetailPage() {
     if (role !== "student") {
       userApi
         .getAll({ role: "student", limit: 200 })
-        .then((r) => setAllStudents(r.data.data || []));
+        .then((r) => setAllStudents(r.data.data || []))
+        .catch(() => {
+          toast.error("Không tải được danh sách học sinh");
+        });
     }
 
     if (role === "admin") {

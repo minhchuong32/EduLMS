@@ -22,10 +22,23 @@ export function AnnouncementsPage() {
   const { user } = useAuth();
 
   useEffect(() => {
+    let alive = true;
+
     announcementApi
       .getAll()
-      .then((r) => setAnnouncements(r.data))
-      .finally(() => setLoading(false));
+      .then((r) => {
+        if (alive) setAnnouncements(r.data);
+      })
+      .catch((err) => {
+        toast.error(err.response?.data?.error || "Không thể tải thông báo");
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
   }, []);
 
   const openCreate = () => {

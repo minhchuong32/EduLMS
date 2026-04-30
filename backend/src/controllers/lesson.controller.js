@@ -28,10 +28,62 @@ const ensureTeacherOwnsLesson = async (lessonId, teacherId) => {
   }
 };
 
+const studentHasClassAccess = async (classId, studentId) => {
+  const result = await query(
+    `
+      SELECT 1
+      FROM StudentClasses
+      WHERE classId = @classId AND studentId = @studentId
+      LIMIT 1
+    `,
+    { classId, studentId },
+  );
+
+  return result.recordset.length > 0;
+};
+
+const ensureCourseAccess = async (courseEnrollmentId, user) => {
+  const result = await query(
+    `
+      SELECT id, teacherId, classId, isActive
+      FROM CourseEnrollments
+      WHERE id = @id AND isActive = true
+      LIMIT 1
+    `,
+    { id: courseEnrollmentId },
+  );
+
+  if (!result.recordset.length) {
+    throw createHttpError(404, "Course not found");
+  }
+
+  const course = result.recordset[0];
+  if (user.role === "admin") {
+    return course;
+  }
+
+  if (
+    user.role === "teacher" &&
+    String(course.teacherId) !== String(user.id)
+  ) {
+    throw createHttpError(403, "Access denied");
+  }
+
+  if (
+    user.role === "student" &&
+    !(await studentHasClassAccess(course.classId, user.id))
+  ) {
+    throw createHttpError(403, "Access denied");
+  }
+
+  throw createHttpError(403, "Access denied");
+};
+
 // GET /api/lessons/course/:courseId
 const getLessonsByCourse = asyncHandler(async (req, res) => {
   const { courseId } = req.params;
   const { role } = req.user;
+  await ensureCourseAccess(courseId, req.user);
   let whereClause = "WHERE l.courseEnrollmentId = @courseId";
   if (role === "student") whereClause += " AND l.isPublished = true";
 
@@ -71,6 +123,13 @@ const getLesson = asyncHandler(async (req, res) => {
     throw createHttpError(404, "Lesson not found");
   }
 
+  const lesson = result.recordset[0];
+  await ensureCourseAccess(lesson.courseEnrollmentId, req.user);
+
+  if (req.user.role === "student" && !lesson.isPublished) {
+    throw createHttpError(404, "Lesson not found");
+  }
+
   const comments = await query(
     `
       SELECT c.*, u.fullName AS authorName, u.avatar AS authorAvatar, u.role AS authorRole
@@ -82,7 +141,6 @@ const getLesson = asyncHandler(async (req, res) => {
     { id },
   );
 
-  const lesson = result.recordset[0];
   lesson.comments = comments.recordset;
 
   res.json(lesson);
@@ -211,6 +269,31 @@ const updateComment = asyncHandler(async (req, res) => {
     throw createHttpError(400, "Comment content is required");
   }
 
+  const ownership = await query(
+    `
+      SELECT c.authorId, ce.teacherId
+      FROM Comments c
+      JOIN Lessons l ON c.lessonId = l.id
+      JOIN CourseEnrollments ce ON l.courseEnrollmentId = ce.id
+      WHERE c.id = @commentId AND c.lessonId = @lessonId
+      LIMIT 1
+    `,
+    { lessonId: id, commentId },
+  );
+
+  if (!ownership.recordset.length) {
+    throw createHttpError(404, "Comment not found");
+  }
+
+  const comment = ownership.recordset[0];
+  if (
+    req.user.role === "teacher" &&
+    String(comment.authorId) !== String(req.user.id) &&
+    String(comment.teacherId) !== String(req.user.id)
+  ) {
+    throw createHttpError(403, "Access denied");
+  }
+
   const result = await query(
     `
       UPDATE Comments
@@ -236,6 +319,31 @@ const updateComment = asyncHandler(async (req, res) => {
 // DELETE /api/lessons/:id/comments/:commentId
 const deleteComment = asyncHandler(async (req, res) => {
   const { id, commentId } = req.params;
+
+  const ownership = await query(
+    `
+      SELECT c.authorId, ce.teacherId
+      FROM Comments c
+      JOIN Lessons l ON c.lessonId = l.id
+      JOIN CourseEnrollments ce ON l.courseEnrollmentId = ce.id
+      WHERE c.id = @commentId AND c.lessonId = @lessonId
+      LIMIT 1
+    `,
+    { lessonId: id, commentId },
+  );
+
+  if (!ownership.recordset.length) {
+    throw createHttpError(404, "Comment not found");
+  }
+
+  const comment = ownership.recordset[0];
+  if (
+    req.user.role === "teacher" &&
+    String(comment.authorId) !== String(req.user.id) &&
+    String(comment.teacherId) !== String(req.user.id)
+  ) {
+    throw createHttpError(403, "Access denied");
+  }
 
   const result = await withTransaction(async (client) =>
     query(

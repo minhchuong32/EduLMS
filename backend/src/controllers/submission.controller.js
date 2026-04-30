@@ -21,61 +21,71 @@ const startSubmission = async (req, res) => {
     const { assignmentId } = req.body;
     const studentId = req.user.id;
 
-    // Check assignment
-    const assignmentResult = await query(
-      `
-        SELECT a.*
-        FROM Assignments a
-        JOIN CourseEnrollments ce ON a.courseEnrollmentId = ce.id
-        JOIN StudentClasses sc ON sc.classId = ce.classId
-        WHERE a.id = @id
-          AND a.isPublished = true
-          AND sc.studentId = @studentId
-          AND (a.startDate IS NULL OR a.startDate <= NOW())
+    const result = await withTransaction(async (client) => {
+      const assignmentResult = await query(
+        `
+          SELECT a.*
+          FROM Assignments a
+          JOIN CourseEnrollments ce ON a.courseEnrollmentId = ce.id
+          JOIN StudentClasses sc ON sc.classId = ce.classId
+          WHERE a.id = @id
+            AND a.isPublished = true
+            AND sc.studentId = @studentId
+            AND (a.startDate IS NULL OR a.startDate <= NOW())
+        `,
+        { id: assignmentId, studentId },
+        client,
+      );
+      if (!assignmentResult.recordset.length) {
+        const error = new Error("Assignment not found or not published");
+        error.status = 404;
+        throw error;
+      }
+
+      const assignment = assignmentResult.recordset[0];
+
+      const attemptResult = await query(
+        "SELECT COUNT(*) AS cnt FROM Submissions WHERE assignmentId = @aid AND studentId = @sid AND status != @s",
+        { aid: assignmentId, sid: studentId, s: "in_progress" },
+        client,
+      );
+      const attempts = attemptResult.recordset[0].cnt;
+
+      if (attempts >= assignment.maxAttempts) {
+        const error = new Error(
+          `Maximum attempts (${assignment.maxAttempts}) reached`,
+        );
+        error.status = 400;
+        throw error;
+      }
+
+      const existing = await query(
+        "SELECT * FROM Submissions WHERE assignmentId = @aid AND studentId = @sid AND status = 'in_progress'",
+        { aid: assignmentId, sid: studentId },
+        client,
+      );
+      if (existing.recordset.length) {
+        return existing.recordset[0];
+      }
+
+      const inserted = await query(
+        `
+        INSERT INTO Submissions (assignmentId, studentId, attemptNumber, status, startedAt)
+        VALUES (@assignmentId, @studentId, @attempt, 'in_progress', NOW())
+        RETURNING *
       `,
-      { id: assignmentId, studentId },
-    );
-    if (!assignmentResult.recordset.length) {
-      return res
-        .status(404)
-        .json({ error: "Assignment not found or not published" });
-    }
+        { assignmentId, studentId, attempt: attempts + 1 },
+        client,
+      );
 
-    const assignment = assignmentResult.recordset[0];
+      return inserted.recordset[0];
+    });
 
-    // Check attempt count
-    const attemptResult = await query(
-      "SELECT COUNT(*) AS cnt FROM Submissions WHERE assignmentId = @aid AND studentId = @sid AND status != @s",
-      { aid: assignmentId, sid: studentId, s: "in_progress" },
-    );
-    const attempts = attemptResult.recordset[0].cnt;
-
-    if (attempts >= assignment.maxAttempts) {
-      return res.status(400).json({
-        error: `Maximum attempts (${assignment.maxAttempts}) reached`,
-      });
-    }
-
-    // Check if in_progress submission exists
-    const existing = await query(
-      "SELECT * FROM Submissions WHERE assignmentId = @aid AND studentId = @sid AND status = 'in_progress'",
-      { aid: assignmentId, sid: studentId },
-    );
-    if (existing.recordset.length) {
-      return res.json(existing.recordset[0]);
-    }
-
-    const result = await query(
-      `
-      INSERT INTO Submissions (assignmentId, studentId, attemptNumber, status, startedAt)
-      VALUES (@assignmentId, @studentId, @attempt, 'in_progress', NOW())
-      RETURNING *
-    `,
-      { assignmentId, studentId, attempt: attempts + 1 },
-    );
-
-    res.status(201).json(result.recordset[0]);
+    res.status(201).json(result);
   } catch (err) {
+    if (err.status) {
+      return res.status(err.status).json({ error: err.message });
+    }
     console.error(err);
     res.status(500).json({ error: "Server error" });
   }
@@ -298,34 +308,38 @@ const gradeSubmission = async (req, res) => {
       }
     }
 
-    await query(
-      `
-      UPDATE Submissions SET
-        score = @score,
-        feedback = @feedback,
-        gradedBy = @gradedBy,
-        gradedAt = NOW(),
-        status = 'graded'
-      WHERE id = @id
-    `,
-      { id, score, feedback, gradedBy: teacherId },
-    );
-
-    // Send notification to student
-    const subResult = await query(
-      "SELECT studentId, assignmentId FROM Submissions WHERE id = @id",
-      { id },
-    );
-    if (subResult.recordset.length) {
-      const { studentId, assignmentId } = subResult.recordset[0];
+    await withTransaction(async (client) => {
       await query(
         `
-        INSERT INTO Notifications (userId, title, message, type, referenceId)
-        VALUES (@userId, 'Bài tập đã được chấm', 'Giáo viên đã chấm bài tập của bạn', 'grade', @refId)
+        UPDATE Submissions SET
+          score = @score,
+          feedback = @feedback,
+          gradedBy = @gradedBy,
+          gradedAt = NOW(),
+          status = 'graded'
+        WHERE id = @id
       `,
-        { userId: studentId, refId: assignmentId },
+        { id, score, feedback, gradedBy: teacherId },
+        client,
       );
-    }
+
+      const subResult = await query(
+        "SELECT studentId, assignmentId FROM Submissions WHERE id = @id",
+        { id },
+        client,
+      );
+      if (subResult.recordset.length) {
+        const { studentId, assignmentId } = subResult.recordset[0];
+        await query(
+          `
+          INSERT INTO Notifications (userId, title, message, type, referenceId)
+          VALUES (@userId, 'Bài tập đã được chấm', 'Giáo viên đã chấm bài tập của bạn', 'grade', @refId)
+        `,
+          { userId: studentId, refId: assignmentId },
+          client,
+        );
+      }
+    });
 
     res.json({ message: "Graded successfully" });
   } catch (err) {

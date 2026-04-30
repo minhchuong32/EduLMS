@@ -1,43 +1,62 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { authApi } from '../services/api';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
+import { authApi } from "../services/api";
 
 const AuthContext = createContext(null);
+const AUTH_STORAGE_KEYS = ["accessToken", "refreshToken"];
+
+const clearAuthStorage = () => {
+  AUTH_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const loadUser = useCallback(async () => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) { setLoading(false); return; }
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     try {
       const { data } = await authApi.getMe();
       setUser(data);
     } catch {
-      localStorage.clear();
+      clearAuthStorage();
+      setUser(null);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { loadUser(); }, [loadUser]);
+  useEffect(() => {
+    loadUser();
+  }, [loadUser]);
 
   const login = async (email, password) => {
     const { data } = await authApi.login({ email, password });
-    localStorage.setItem('accessToken', data.accessToken);
-    localStorage.setItem('refreshToken', data.refreshToken);
+    localStorage.setItem("accessToken", data.accessToken);
+    localStorage.setItem("refreshToken", data.refreshToken);
     setUser(data.user);
     return data.user;
   };
 
   const logout = async () => {
-    const refreshToken = localStorage.getItem('refreshToken');
-    try { await authApi.logout({ refreshToken }); } catch {}
-    localStorage.clear();
+    const refreshToken = localStorage.getItem("refreshToken");
+    try {
+      await authApi.logout({ refreshToken });
+    } catch {}
+    clearAuthStorage();
     setUser(null);
   };
 
-  const updateUser = (updates) => setUser(prev => ({ ...prev, ...updates }));
+  const updateUser = (updates) => setUser((prev) => ({ ...prev, ...updates }));
 
   return (
     <AuthContext.Provider value={{ user, loading, login, logout, updateUser }}>
@@ -48,6 +67,6 @@ export const AuthProvider = ({ children }) => {
 
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 };

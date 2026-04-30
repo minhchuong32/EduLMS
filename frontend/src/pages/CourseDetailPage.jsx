@@ -118,6 +118,8 @@ export default function CourseDetailPage() {
   const canManageAnnouncements = user.role !== "student";
 
   useEffect(() => {
+    let alive = true;
+
     const load = async () => {
       try {
         const [courseRes, lessonRes, assignmentRes] = await Promise.all([
@@ -148,12 +150,23 @@ export default function CourseDetailPage() {
           );
 
         setAnnouncements(mergedAnnouncements);
+      } catch (err) {
+        if (alive) {
+          setCourse(null);
+          setLessons([]);
+          setAssignments([]);
+          setAnnouncements([]);
+          toast.error(err.response?.data?.error || "Không thể tải khóa học");
+        }
       } finally {
-        setLoading(false);
+        if (alive) setLoading(false);
       }
     };
 
     load();
+    return () => {
+      alive = false;
+    };
   }, [id]);
 
   useEffect(() => {

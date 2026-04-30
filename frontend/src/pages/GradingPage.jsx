@@ -17,12 +17,25 @@ export default function GradingPage() {
   const [showDetail, setShowDetail] = useState(false); // mobile: toggle list ↔ detail
 
   useEffect(() => {
+    let alive = true;
+
     Promise.all([assignmentApi.getById(id), submissionApi.getByAssignment(id)])
       .then(([a, s]) => {
         setAssignment(a.data);
         setSubmissions(s.data);
       })
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        toast.error(
+          err.response?.data?.error || "Không thể tải dữ liệu chấm điểm",
+        );
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
   }, [id]);
 
   const loadDetail = async (subId) => {

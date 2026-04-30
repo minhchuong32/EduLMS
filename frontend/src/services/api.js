@@ -7,6 +7,12 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
+const AUTH_STORAGE_KEYS = ["accessToken", "refreshToken"];
+
+const clearAuthStorage = () => {
+  AUTH_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+};
+
 // Request interceptor - attach token
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("accessToken");
@@ -59,7 +65,7 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (err) {
         processQueue(err, null);
-        localStorage.clear();
+        clearAuthStorage();
         window.location.href = "/login";
         return Promise.reject(err);
       } finally {

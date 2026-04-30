@@ -28,10 +28,24 @@ export default function LessonDetailPage() {
   const canManageComments = ["admin", "teacher"].includes(user?.role);
 
   useEffect(() => {
+    let alive = true;
+
     lessonApi
       .getById(id)
-      .then((r) => setLesson(r.data))
-      .finally(() => setLoading(false));
+      .then((r) => {
+        if (alive) setLesson(r.data);
+      })
+      .catch((err) => {
+        toast.error(err.response?.data?.error || "Không thể tải bài học");
+        if (alive) setLesson(null);
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
   }, [id]);
 
   const handleComment = async (e) => {
