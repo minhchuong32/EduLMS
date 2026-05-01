@@ -76,7 +76,7 @@ const ensureCourseAccess = async (courseEnrollmentId, user) => {
     throw createHttpError(403, "Access denied");
   }
 
-  throw createHttpError(403, "Access denied");
+  return course;
 };
 
 // GET /api/lessons/course/:courseId

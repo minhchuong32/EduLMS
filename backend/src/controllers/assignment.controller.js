@@ -54,11 +54,11 @@ const getAssignmentsByCourse = async (req, res) => {
     const { role, id: userId } = req.user;
 
     const courseAccess = await ensureCourseAccess(courseId, req.user);
-    if (!courseAccess) {
-      return res.status(404).json({ error: "Course not found" });
-    }
     if (courseAccess === false) {
       return res.status(403).json({ error: "Access denied" });
+    }
+    if (!courseAccess) {
+      return res.status(404).json({ error: "Course not found" });
     }
 
     let whereClause = "WHERE a.courseEnrollmentId = @courseId";
