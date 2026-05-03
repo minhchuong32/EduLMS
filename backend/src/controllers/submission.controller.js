@@ -44,6 +44,20 @@ const startSubmission = async (req, res) => {
 
       const assignment = assignmentResult.recordset[0];
 
+      if (assignment.type === "file") {
+        const completedFileSubmissionResult = await query(
+          "SELECT 1 FROM Submissions WHERE assignmentId = @aid AND studentId = @sid AND status != 'in_progress' LIMIT 1",
+          { aid: assignmentId, sid: studentId },
+          client,
+        );
+
+        if (completedFileSubmissionResult.recordset.length) {
+          const error = new Error("File assignment has already been submitted");
+          error.status = 409;
+          throw error;
+        }
+      }
+
       const attemptResult = await query(
         "SELECT COUNT(*) AS cnt FROM Submissions WHERE assignmentId = @aid AND studentId = @sid AND status != @s",
         { aid: assignmentId, sid: studentId, s: "in_progress" },
@@ -248,6 +262,23 @@ const submitEssay = async (req, res) => {
       return res.status(404).json({ error: "Submission not found" });
     }
 
+    const existingSubmittedResult = await query(
+      "SELECT 1 FROM Submissions WHERE assignmentId = @aid AND studentId = @sid AND status != 'in_progress' LIMIT 1",
+      { aid: result.recordset[0].assignmentId, sid: studentId },
+    );
+
+    const submissionTypeResult = await query(
+      "SELECT type FROM Assignments WHERE id = @id",
+      { id: result.recordset[0].assignmentId },
+    );
+    const assignmentType = submissionTypeResult.recordset[0]?.type;
+
+    if (assignmentType === "file" && existingSubmittedResult.recordset.length) {
+      return res
+        .status(409)
+        .json({ error: "File assignment has already been submitted" });
+    }
+
     const assignmentResult = await query(
       "SELECT dueDate FROM Assignments WHERE id = @id",
       { id: result.recordset[0].assignmentId },
@@ -420,6 +451,12 @@ const getSubmissionDetail = async (req, res) => {
       return res.status(403).json({ error: "Access denied" });
     }
 
+    if (role === "student") {
+      if (submission.assignmentType === "file") {
+        delete submission.fileUrl;
+      }
+    }
+
     if (submission.assignmentType === "quiz") {
       const answers = await query(
         `
@@ -471,7 +508,21 @@ const getMySubmission = async (req, res) => {
       { aid: assignmentId, sid: studentId },
     );
 
-    res.json(result.recordset);
+    const assignmentResult = await query(
+      "SELECT type FROM Assignments WHERE id = @id",
+      { id: assignmentId },
+    );
+    const assignmentType = assignmentResult.recordset[0]?.type;
+
+    const submissions = result.recordset.map((submission) => {
+      const item = { ...submission };
+      if (assignmentType === "file") {
+        delete item.fileUrl;
+      }
+      return item;
+    });
+
+    res.json(submissions);
   } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
