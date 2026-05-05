@@ -300,9 +300,15 @@ const migrate = async () => {
         message text,
         type varchar(50),
         referenceId uuid,
+        senderRole varchar(20),
         isRead boolean NOT NULL DEFAULT false,
         createdAt timestamptz NOT NULL DEFAULT now()
       );
+    `);
+
+    await query(`
+      ALTER TABLE notifications
+      ADD COLUMN IF NOT EXISTS senderRole varchar(20);
     `);
 
     await query(`

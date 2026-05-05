@@ -1,4 +1,8 @@
 const { query, withTransaction } = require("../config/database");
+const {
+  ensureNotificationSchema,
+  notifyClassStudents,
+} = require("../utils/notification");
 
 const studentHasClassAccess = async (classId, studentId) => {
   const result = await query(
@@ -119,7 +123,10 @@ const getAssignment = async (req, res) => {
 
     const assignment = result.recordset[0];
 
-    if (req.user.role === "teacher" && String(assignment.teacherId) !== String(req.user.id)) {
+    if (
+      req.user.role === "teacher" &&
+      String(assignment.teacherId) !== String(req.user.id)
+    ) {
       return res.status(403).json({ error: "Access denied" });
     }
 
@@ -373,29 +380,51 @@ const publishAssignment = async (req, res) => {
     const { id } = req.params;
     const { publish } = req.body;
 
-    const check = await query(
+    const current = await query(
       `
-      SELECT a.id FROM Assignments a
+      SELECT a.id, a.title, a.isPublished, ce.classId
+      FROM Assignments a
       JOIN CourseEnrollments ce ON a.courseEnrollmentId = ce.id
       WHERE a.id = @id AND ce.teacherId = @teacherId
     `,
       { id, teacherId: req.user.id },
     );
 
-    if (!check.recordset.length) {
+    if (!current.recordset.length) {
       return res.status(403).json({ error: "Access denied" });
     }
 
-    await query(
-      `
-      UPDATE Assignments SET 
-        isPublished = @published,
-        publishedAt = CASE WHEN @published THEN NOW() ELSE NULL END,
-        updatedAt = NOW()
-      WHERE id = @id
-    `,
-      { id, published: !!publish },
-    );
+    const assignment = current.recordset[0];
+    const shouldNotify = !assignment.isPublished && !!publish;
+
+    await withTransaction(async (client) => {
+      await ensureNotificationSchema();
+      await query(
+        `
+        UPDATE Assignments SET 
+          isPublished = @published,
+          publishedAt = CASE WHEN @published THEN NOW() ELSE NULL END,
+          updatedAt = NOW()
+        WHERE id = @id
+      `,
+        { id, published: !!publish },
+        client,
+      );
+
+      if (shouldNotify) {
+        await notifyClassStudents(
+          {
+            classId: assignment.classId,
+            title: "Bài tập mới",
+            message: `Giảng viên vừa công bố bài tập \"${assignment.title}\"`,
+            type: "assignment_published",
+            referenceId: assignment.id,
+            senderRole: "teacher",
+          },
+          client,
+        );
+      }
+    });
 
     res.json({
       message: `Assignment ${publish ? "published" : "unpublished"} successfully`,

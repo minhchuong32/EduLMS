@@ -1,4 +1,5 @@
 const { query, withTransaction } = require("../config/database");
+const { ensureNotificationSchema } = require("../utils/notification");
 
 const ensureTeacherOwnsAssignment = async (assignmentId, teacherId) => {
   const check = await query(
@@ -340,6 +341,7 @@ const gradeSubmission = async (req, res) => {
     }
 
     await withTransaction(async (client) => {
+      await ensureNotificationSchema();
       await query(
         `
         UPDATE Submissions SET
@@ -363,10 +365,10 @@ const gradeSubmission = async (req, res) => {
         const { studentId, assignmentId } = subResult.recordset[0];
         await query(
           `
-          INSERT INTO Notifications (userId, title, message, type, referenceId)
-          VALUES (@userId, 'Bài tập đã được chấm', 'Giáo viên đã chấm bài tập của bạn', 'grade', @refId)
+          INSERT INTO Notifications (userId, title, message, type, referenceId, senderRole)
+          VALUES (@userId, 'Bài tập đã được chấm', 'Giáo viên đã chấm bài tập của bạn', 'grade', @refId::uuid, @senderRole)
         `,
-          { userId: studentId, refId: assignmentId },
+          { userId: studentId, refId: assignmentId, senderRole: "teacher" },
           client,
         );
       }

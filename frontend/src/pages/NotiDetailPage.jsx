@@ -9,10 +9,12 @@ import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import { notificationApi } from "../services/api";
 import { toast } from "react-toastify";
+import { useAuth } from "../context/AuthContext";
 
 export default function NotiDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { user } = useAuth();
   const [notification, setNotification] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -68,6 +70,9 @@ export default function NotiDetailPage() {
     }
   };
 
+  const canDeleteNotification =
+    user?.role === "admin" || notification?.senderRole === user?.role;
+
   if (loading) {
     return (
       <div className="flex justify-center py-10">
@@ -115,18 +120,31 @@ export default function NotiDetailPage() {
               })}
             </p>
           </div>
-          <button
-            onClick={handleDelete}
-            className="rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
-            aria-label="Xóa thông báo"
-          >
-            <TrashIcon className="h-5 w-5" />
-          </button>
+          {canDeleteNotification && (
+            <button
+              onClick={handleDelete}
+              className="rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+              aria-label="Xóa thông báo"
+            >
+              <TrashIcon className="h-5 w-5" />
+            </button>
+          )}
         </div>
 
         <div className="rounded-xl bg-slate-50 p-4 text-sm leading-7 text-slate-700 whitespace-pre-wrap">
           {notification.message || "Không có nội dung chi tiết"}
         </div>
+
+        {notification.targetUrl && (
+          <div className="mt-4">
+            <Link
+              to={notification.targetUrl}
+              className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+            >
+              Mở khóa học liên quan
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );

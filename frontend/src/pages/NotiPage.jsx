@@ -5,9 +5,11 @@ import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
 import { notificationApi } from "../services/api";
 import { toast } from "react-toastify";
+import { useAuth } from "../context/AuthContext";
 
 export default function NotiPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -36,6 +38,9 @@ export default function NotiPage() {
     window.dispatchEvent(new Event("notifications:refresh"));
   };
 
+  const canDeleteNotification = (item) =>
+    user?.role === "admin" || item?.senderRole === user?.role;
+
   const handleOpenNotification = async (item) => {
     if (!item.isRead) {
       setNotifications((prev) =>
@@ -48,7 +53,7 @@ export default function NotiPage() {
       }
       emitRefresh();
     }
-    navigate(`/noti/${item.id}`);
+    navigate(item.targetUrl || `/noti/${item.id}`);
   };
 
   const handleDeleteNotification = async (event, id) => {
@@ -78,7 +83,7 @@ export default function NotiPage() {
     <div className="max-w-3xl mx-auto p-4 md:p-6">
       <div className="mb-5 flex items-center justify-between">
         <h1 className="text-xl md:text-2xl font-bold text-gray-900">
-          Thông báo quản trị
+          Danh sách thông báo
         </h1>
       </div>
 
@@ -126,8 +131,13 @@ export default function NotiPage() {
                 </div>
 
                 <button
+                  disabled={!canDeleteNotification(item)}
                   onClick={(event) => handleDeleteNotification(event, item.id)}
-                  className="rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                  className={`rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600 ${
+                    canDeleteNotification(item)
+                      ? ""
+                      : "pointer-events-none opacity-0"
+                  }`}
                   aria-label="Xóa thông báo"
                 >
                   <TrashIcon className="h-4 w-4" />

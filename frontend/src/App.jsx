@@ -111,7 +111,7 @@ function AppRoutes() {
         <Route
           path="noti"
           element={
-            <PrivateRoute roles={["admin"]}>
+            <PrivateRoute roles={["admin", "teacher", "student"]}>
               <NotiPage />
             </PrivateRoute>
           }
@@ -119,7 +119,7 @@ function AppRoutes() {
         <Route
           path="noti/:id"
           element={
-            <PrivateRoute roles={["admin"]}>
+            <PrivateRoute roles={["admin", "teacher", "student"]}>
               <NotiDetailPage />
             </PrivateRoute>
           }

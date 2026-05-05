@@ -1,5 +1,6 @@
 const { query, withTransaction } = require("../config/database");
 const bcrypt = require("bcryptjs");
+const { ensureNotificationSchema } = require("../utils/notification");
 
 // ==================== USER CONTROLLER ====================
 const getUsers = async (req, res) => {
@@ -261,8 +262,8 @@ const requestAccountDeletion = async (req, res) => {
     await withTransaction(async (client) => {
       const created = await query(
         `
-        INSERT INTO Notifications (userId, title, message, type, referenceId)
-        SELECT id, @title, @message, 'account_delete_request', @referenceId
+        INSERT INTO Notifications (userId, title, message, type, referenceId, senderRole)
+        SELECT id, @title, @message, 'account_delete_request', @referenceId::uuid, @senderRole
         FROM Users
         WHERE role = 'admin' AND isActive = true
         RETURNING id
@@ -271,6 +272,7 @@ const requestAccountDeletion = async (req, res) => {
           title,
           message,
           referenceId: requester.id,
+          senderRole: requester.role,
         },
         client,
       );
@@ -1268,9 +1270,27 @@ const deleteAnnouncement = async (req, res) => {
 // ==================== NOTIFICATION CONTROLLER ====================
 const getNotifications = async (req, res) => {
   try {
+    await ensureNotificationSchema();
     const result = await query(
       `
-      SELECT * FROM Notifications WHERE userId = @userId ORDER BY createdAt DESC LIMIT 50
+      SELECT
+        n.*,
+        CASE
+          WHEN n.type = 'assignment_published' THEN '/courses/' || a.courseEnrollmentId::text
+          WHEN n.type = 'grade' THEN '/courses/' || ag.courseEnrollmentId::text
+          WHEN n.type = 'lesson_published' THEN '/courses/' || l.courseEnrollmentId::text
+          ELSE NULL
+        END AS targetUrl
+      FROM Notifications n
+      LEFT JOIN Assignments a
+        ON n.type = 'assignment_published' AND n.referenceId = a.id
+      LEFT JOIN Assignments ag
+        ON n.type = 'grade' AND n.referenceId = ag.id
+      LEFT JOIN Lessons l
+        ON n.type = 'lesson_published' AND n.referenceId = l.id
+      WHERE n.userId = @userId
+      ORDER BY n.createdAt DESC
+      LIMIT 50
     `,
       { userId: req.user.id },
     );
@@ -1282,12 +1302,26 @@ const getNotifications = async (req, res) => {
 
 const getNotificationById = async (req, res) => {
   try {
+    await ensureNotificationSchema();
     const { id } = req.params;
     const result = await query(
       `
-      SELECT *
-      FROM Notifications
-      WHERE id = @id AND userId = @userId
+      SELECT
+        n.*,
+        CASE
+          WHEN n.type = 'assignment_published' THEN '/courses/' || a.courseEnrollmentId::text
+          WHEN n.type = 'grade' THEN '/courses/' || ag.courseEnrollmentId::text
+          WHEN n.type = 'lesson_published' THEN '/courses/' || l.courseEnrollmentId::text
+          ELSE NULL
+        END AS targetUrl
+      FROM Notifications n
+      LEFT JOIN Assignments a
+        ON n.type = 'assignment_published' AND n.referenceId = a.id
+      LEFT JOIN Assignments ag
+        ON n.type = 'grade' AND n.referenceId = ag.id
+      LEFT JOIN Lessons l
+        ON n.type = 'lesson_published' AND n.referenceId = l.id
+      WHERE n.id = @id AND n.userId = @userId
       LIMIT 1
     `,
       { id, userId: req.user.id },
@@ -1328,7 +1362,44 @@ const markNotificationRead = async (req, res) => {
 
 const deleteNotification = async (req, res) => {
   try {
+    await ensureNotificationSchema();
     const { id } = req.params;
+
+    if (req.user.role === "admin") {
+      const result = await query(
+        `
+        DELETE FROM Notifications
+        WHERE id = @id
+        RETURNING id
+      `,
+        { id },
+      );
+
+      if (!result.recordset.length) {
+        return res.status(404).json({ error: "Notification not found" });
+      }
+
+      return res.json({ message: "Notification deleted" });
+    }
+
+    const notification = await query(
+      `
+      SELECT id, senderRole
+      FROM Notifications
+      WHERE id = @id AND userId = @userId
+      LIMIT 1
+    `,
+      { id, userId: req.user.id },
+    );
+
+    if (!notification.recordset.length) {
+      return res.status(404).json({ error: "Notification not found" });
+    }
+
+    if (notification.recordset[0].senderRole !== req.user.role) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
     const result = await query(
       `
       DELETE FROM Notifications

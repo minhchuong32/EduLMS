@@ -1,6 +1,10 @@
 const { query, withTransaction } = require("../config/database");
 const { asyncHandler } = require("../utils/asyncHandler");
 const { createHttpError } = require("../utils/httpError");
+const {
+  ensureNotificationSchema,
+  notifyClassStudents,
+} = require("../utils/notification");
 
 const ensureTeacherOwnsCourse = async (courseEnrollmentId, teacherId) => {
   const check = await query(
@@ -62,10 +66,7 @@ const ensureCourseAccess = async (courseEnrollmentId, user) => {
     return course;
   }
 
-  if (
-    user.role === "teacher" &&
-    String(course.teacherId) !== String(user.id)
-  ) {
+  if (user.role === "teacher" && String(course.teacherId) !== String(user.id)) {
     throw createHttpError(403, "Access denied");
   }
 
@@ -209,18 +210,51 @@ const publishLesson = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { publish } = req.body;
 
-  await ensureTeacherOwnsLesson(id, req.user.id);
-
-  await query(
+  const lessonResult = await query(
     `
-      UPDATE Lessons SET
-        isPublished = @pub,
-        publishedAt = CASE WHEN @pub THEN NOW() ELSE NULL END,
-        updatedAt = NOW()
-      WHERE id = @id
+      SELECT l.id, l.title, l.isPublished, ce.classId
+      FROM Lessons l
+      JOIN CourseEnrollments ce ON l.courseEnrollmentId = ce.id
+      WHERE l.id = @id AND ce.teacherId = @teacherId
     `,
-    { id, pub: !!publish },
+    { id, teacherId: req.user.id },
   );
+
+  if (!lessonResult.recordset.length) {
+    throw createHttpError(403, "Access denied");
+  }
+
+  const lesson = lessonResult.recordset[0];
+  const shouldNotify = !lesson.isPublished && !!publish;
+
+  await withTransaction(async (client) => {
+    await ensureNotificationSchema();
+    await query(
+      `
+        UPDATE Lessons SET
+          isPublished = @pub,
+          publishedAt = CASE WHEN @pub THEN NOW() ELSE NULL END,
+          updatedAt = NOW()
+        WHERE id = @id
+      `,
+      { id, pub: !!publish },
+      client,
+    );
+
+    if (shouldNotify) {
+      await notifyClassStudents(
+        {
+          classId: lesson.classId,
+          title: "Bài giảng mới",
+          message: `Giảng viên vừa công bố bài giảng \"${lesson.title}\"`,
+          type: "lesson_published",
+          referenceId: lesson.id,
+          senderRole: "teacher",
+        },
+        client,
+      );
+    }
+  });
 
   res.json({ message: `Lesson ${publish ? "published" : "unpublished"}` });
 });

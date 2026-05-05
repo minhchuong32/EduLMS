@@ -224,7 +224,7 @@ export default function Layout() {
       },
       {
         keyword: "noti notification",
-        to: user?.role === "admin" ? "/noti" : "/announcements",
+        to: "/noti",
       },
       { keyword: "ho so profile", to: "/profile" },
       { keyword: "profile", to: "/profile" },
@@ -455,13 +455,7 @@ export default function Layout() {
 
   const handleNotificationsClick = () => {
     setShowSettings(false);
-    if (user?.role === "admin") {
-      setShowNotifications((prev) => !prev);
-      return;
-    }
-
-    navigate("/announcements");
-    setMobileOpen(false);
+    setShowNotifications((prev) => !prev);
   };
 
   const handleNotificationItemClick = () => {
@@ -488,7 +482,7 @@ export default function Layout() {
     }
 
     handleNotificationItemClick();
-    navigate(`/noti/${item.id}`);
+    navigate(item.targetUrl || `/noti/${item.id}`);
   };
 
   const handleDeleteNotification = async (event, id) => {
@@ -507,6 +501,9 @@ export default function Layout() {
       loadNotifications();
     }
   };
+
+  const canDeleteNotification = (item) =>
+    user?.role === "admin" || item?.senderRole === user?.role;
 
   const NavLink = ({ to, icon: Icon, label, onClick }) => {
     const active = isActive(to);
@@ -953,7 +950,7 @@ export default function Layout() {
                   )}
                 </button>
 
-                {user?.role === "admin" && showNotifications && (
+                {showNotifications && (
                   <div className="absolute right-0 top-full z-30 mt-2 w-96 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
                     <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
                       <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
@@ -1013,10 +1010,15 @@ export default function Layout() {
                                 </p>
                               </div>
                               <button
+                                disabled={!canDeleteNotification(item)}
                                 onClick={(event) =>
                                   handleDeleteNotification(event, item.id)
                                 }
-                                className="rounded-lg p-1.5 text-slate-400 opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                                className={`rounded-lg p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 ${
+                                  canDeleteNotification(item)
+                                    ? "opacity-0"
+                                    : "pointer-events-none opacity-0"
+                                }`}
                                 aria-label="Xóa thông báo"
                               >
                                 <TrashIcon className="h-4 w-4" />
