@@ -20,7 +20,6 @@ import ProfilePage from "./pages/ProfilePage";
 import AnnouncementsPage from "./pages/AnnouncementsPage";
 import GradingPage from "./pages/GradingPage";
 import NotiPage from "./pages/NotiPage";
-import NotiDetailPage from "./pages/NotiDetailPage";
 import SupportPage from "./pages/SupportPage";
 import Layout from "./components/common/Layout";
 
@@ -116,14 +115,7 @@ function AppRoutes() {
             </PrivateRoute>
           }
         />
-        <Route
-          path="noti/:id"
-          element={
-            <PrivateRoute roles={["admin", "teacher", "student"]}>
-              <NotiDetailPage />
-            </PrivateRoute>
-          }
-        />
+        <Route path="noti/:id" element={<Navigate to="/noti" replace />} />
         <Route
           path="support"
           element={

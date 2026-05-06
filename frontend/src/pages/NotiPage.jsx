@@ -39,7 +39,7 @@ export default function NotiPage() {
   };
 
   const canDeleteNotification = (item) =>
-    user?.role === "admin" || item?.senderRole === user?.role;
+    user?.role === "admin" || item?.userId === user?.id;
 
   const handleOpenNotification = async (item) => {
     if (!item.isRead) {
@@ -53,7 +53,7 @@ export default function NotiPage() {
       }
       emitRefresh();
     }
-    navigate(item.targetUrl || `/noti/${item.id}`);
+    navigate(item.targetUrl || "/noti");
   };
 
   const handleDeleteNotification = async (event, id) => {

@@ -482,7 +482,7 @@ export default function Layout() {
     }
 
     handleNotificationItemClick();
-    navigate(item.targetUrl || `/noti/${item.id}`);
+    navigate(item.targetUrl || "/noti");
   };
 
   const handleDeleteNotification = async (event, id) => {
@@ -503,7 +503,7 @@ export default function Layout() {
   };
 
   const canDeleteNotification = (item) =>
-    user?.role === "admin" || item?.senderRole === user?.role;
+    user?.role === "admin" || item?.userId === user?.id;
 
   const NavLink = ({ to, icon: Icon, label, onClick }) => {
     const active = isActive(to);

@@ -1382,24 +1382,6 @@ const deleteNotification = async (req, res) => {
       return res.json({ message: "Notification deleted" });
     }
 
-    const notification = await query(
-      `
-      SELECT id, senderRole
-      FROM Notifications
-      WHERE id = @id AND userId = @userId
-      LIMIT 1
-    `,
-      { id, userId: req.user.id },
-    );
-
-    if (!notification.recordset.length) {
-      return res.status(404).json({ error: "Notification not found" });
-    }
-
-    if (notification.recordset[0].senderRole !== req.user.role) {
-      return res.status(403).json({ error: "Access denied" });
-    }
-
     const result = await query(
       `
       DELETE FROM Notifications
