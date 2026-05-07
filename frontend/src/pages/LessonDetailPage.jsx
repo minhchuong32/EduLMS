@@ -3,16 +3,13 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { lessonApi } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
+import { getFileUrl } from "../services/runtimeUrl";
 import {
   ArrowLeftIcon,
   PaperClipIcon,
   ChatBubbleLeftIcon,
 } from "@heroicons/react/24/outline";
 import { format } from "date-fns";
-
-const FILE_BASE_URL = (
-  process.env.REACT_APP_API_URL || "http://localhost:5000/api"
-).replace(/\/api\/?$/, "");
 
 export default function LessonDetailPage() {
   const { id } = useParams();
@@ -283,7 +280,7 @@ export default function LessonDetailPage() {
 
         {lesson.fileUrl && (
           <a
-            href={`${FILE_BASE_URL}${lesson.fileUrl}`}
+            href={getFileUrl(lesson.fileUrl)}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-xl text-sm hover:bg-gray-200 mb-5 active:bg-gray-300"

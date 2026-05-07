@@ -4,6 +4,7 @@ import { submissionApi, assignmentApi } from "../services/api";
 import { toast } from "react-toastify";
 import { CheckCircleIcon, ChevronLeftIcon } from "@heroicons/react/24/outline";
 import { format } from "date-fns";
+import { getFileUrl } from "../services/runtimeUrl";
 
 export default function GradingPage() {
   const { id } = useParams();
@@ -201,7 +202,7 @@ export default function GradingPage() {
 
               {detail.fileUrl && (
                 <a
-                  href={`http://localhost:5000${detail.fileUrl}`}
+                  href={getFileUrl(detail.fileUrl)}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-2 text-sm text-blue-600 hover:underline mb-4"

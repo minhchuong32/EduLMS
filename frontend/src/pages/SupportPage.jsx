@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
 import { chatApi, supportApi } from "../services/api";
 import { getChatSocket } from "../services/chatSocket";
+import { getFileUrl } from "../services/runtimeUrl";
 import {
   ChatBubbleLeftRightIcon,
   ClockIcon,
@@ -20,10 +21,6 @@ import { format } from "date-fns";
 const SUPPORT_EMAIL = "support@edulms.local";
 const SUPPORT_PHONE = "1900 1234";
 const HISTORY_STORAGE_KEY = "supportRequestHistory";
-
-const FILE_BASE_URL = (
-  process.env.REACT_APP_API_URL || "http://localhost:5000/api"
-).replace(/\/api\/?$/, "");
 
 const INITIAL_FORM = {
   category: "technical",
@@ -481,7 +478,9 @@ export default function SupportPage() {
                     : "bg-amber-100 text-amber-700"
                 }`}
               >
-                {socketReady ? "Đang kết nối trực tuyến" : "Đang ở chế độ thường"}
+                {socketReady
+                  ? "Đang kết nối trực tuyến"
+                  : "Đang ở chế độ thường"}
               </span>
             </div>
           </div>
@@ -541,7 +540,7 @@ export default function SupportPage() {
                   <div className="mb-3 flex items-center gap-2 border-b border-slate-100 pb-3 dark:border-slate-800">
                     {selectedContact.avatar ? (
                       <img
-                        src={`${FILE_BASE_URL}${selectedContact.avatar}`}
+                        src={getFileUrl(selectedContact.avatar)}
                         alt="avatar"
                         className="h-8 w-8 rounded-full object-cover"
                       />
@@ -585,13 +584,13 @@ export default function SupportPage() {
                             >
                               {hasImage && (
                                 <a
-                                  href={`${FILE_BASE_URL}${item.fileUrl}`}
+                                  href={getFileUrl(item.fileUrl)}
                                   target="_blank"
                                   rel="noreferrer"
                                   className="mb-2 block overflow-hidden rounded-xl"
                                 >
                                   <img
-                                    src={`${FILE_BASE_URL}${item.fileUrl}`}
+                                    src={getFileUrl(item.fileUrl)}
                                     alt={item.fileName || "attachment"}
                                     className="max-h-64 w-full rounded-xl object-cover"
                                   />

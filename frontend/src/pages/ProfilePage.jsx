@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { userApi, authApi } from "../services/api";
 import { toast } from "react-toastify";
+import { getFileUrl } from "../services/runtimeUrl";
 import {
   CameraIcon,
   CheckBadgeIcon,
@@ -48,10 +49,6 @@ export function ProfilePage() {
     newPassword: "",
   });
 
-  const FILE_BASE_URL = (
-    process.env.REACT_APP_API_URL || "http://localhost:5000/api"
-  ).replace(/\/api\/?$/, "");
-
   useEffect(() => {
     setForm({
       fullName: user?.fullName || "",
@@ -82,9 +79,9 @@ export function ProfilePage() {
 
   const avatarSrc = useMemo(() => {
     if (avatarPreview) return avatarPreview;
-    if (user?.avatar) return `${FILE_BASE_URL}${user.avatar}`;
+    if (user?.avatar) return getFileUrl(user.avatar);
     return "";
-  }, [FILE_BASE_URL, avatarPreview, user?.avatar]);
+  }, [avatarPreview, user?.avatar]);
 
   const handlePickAvatar = () => {
     avatarInputRef.current?.click();

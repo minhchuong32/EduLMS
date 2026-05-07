@@ -6,6 +6,7 @@ const path = require("path");
 const rateLimit = require("express-rate-limit");
 const slowDown = require("express-slow-down");
 require("dotenv").config();
+const { UPLOAD_DIR } = require("./config/uploads");
 
 const app = express();
 const isProduction = process.env.NODE_ENV === "production";
@@ -100,7 +101,7 @@ if (process.env.NODE_ENV !== "test") {
 // ======================
 app.use(
   "/uploads",
-  express.static(path.join(__dirname, "../uploads"), {
+  express.static(UPLOAD_DIR, {
     setHeaders: (res) => {
       res.setHeader("X-Content-Type-Options", "nosniff");
     },

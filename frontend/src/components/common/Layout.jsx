@@ -29,13 +29,10 @@ import {
 import { toast } from "react-toastify";
 import { useTheme } from "../../context/ThemeContext";
 import { classApi, courseApi, notificationApi } from "../../services/api";
+import { getFileUrl } from "../../services/runtimeUrl";
 import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
 import { enUS } from "date-fns/locale";
-
-const FILE_BASE_URL = (
-  process.env.REACT_APP_API_URL || "http://localhost:5000/api"
-).replace(/\/api\/?$/, "");
 
 const NAV_ITEMS = {
   vi: {
@@ -681,7 +678,7 @@ export default function Layout() {
                 <Link to="/profile">
                   {user?.avatar ? (
                     <img
-                      src={`${FILE_BASE_URL}${user.avatar}`}
+                      src={getFileUrl(user.avatar)}
                       alt="avatar"
                       className="h-8 w-8 rounded-full object-cover"
                     />
@@ -1039,7 +1036,7 @@ export default function Layout() {
                 >
                   {user?.avatar ? (
                     <img
-                      src={`${FILE_BASE_URL}${user.avatar}`}
+                      src={getFileUrl(user.avatar)}
                       alt="avatar"
                       className="h-8 w-8 rounded-full object-cover"
                     />

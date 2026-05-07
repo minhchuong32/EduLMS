@@ -29,11 +29,9 @@ import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import CreateLessonModal from "../components/teacher/CreateLessonModal";
 import CreateAssignmentModal from "../components/teacher/CreateAssignmentModal";
+import { getFileUrl } from "../services/runtimeUrl";
 
 const TABS = ["Bài giảng", "Bài tập", "Thông báo"];
-const FILE_BASE_URL = (
-  process.env.REACT_APP_API_URL || "http://localhost:5000/api"
-).replace(/\/api\/?$/, "");
 
 const getEmbedUrl = (url) => {
   if (!url) return null;
@@ -597,7 +595,7 @@ export default function CourseDetailPage() {
                   </div>
                   {selectedLessonDetail?.fileUrl && (
                     <a
-                      href={`${FILE_BASE_URL}${selectedLessonDetail.fileUrl}`}
+                      href={getFileUrl(selectedLessonDetail.fileUrl)}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
